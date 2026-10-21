@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<!--
+  VoiceShop architecture diagram source. Render to assets/architecture-diagram.png
+  at 1600x1000 (for example with a headless browser screenshot).
+  Icons: the official AWS Architecture Icons package (aws.amazon.com/architecture/icons),
+  copied into assets/icons/ (not committed) under the file names used below.
+-->
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  body{margin:0;background:#fff;font-family:Helvetica,Arial,sans-serif;color:#232F3E;}
+  .canvas{position:relative;width:1600px;height:1000px;margin:0 auto;background:#fff;}
+  .title{position:absolute;left:30px;top:18px;font-size:20px;font-weight:bold;}
+  .subtitle{position:absolute;left:30px;top:46px;width:1540px;font-size:11px;color:#545B64;}
+  .boundary{position:absolute;border:2px solid #232F3E;border-radius:6px;}
+  .boundary-label{position:absolute;background:#fff;padding:0 6px;font-size:12px;font-weight:bold;}
+  .group{position:absolute;border:1.5px dashed #879196;border-radius:5px;}
+  .vpc{position:absolute;border:2px solid #8C4FFF;border-radius:4px;background:#F7F2FF;}
+  .vpc-label{position:absolute;white-space:nowrap;display:flex;align-items:center;gap:5px;background:#fff;padding:0 6px;font-size:10.5px;font-weight:bold;color:#5A2BB5;}
+  .vpc-label img{width:16px;height:16px;}
+  .group-label{position:absolute;background:#fff;padding:0 5px;font-size:10.5px;font-weight:bold;color:#545B64;}
+  .svc{position:absolute;display:flex;flex-direction:column;align-items:center;width:104px;text-align:center;}
+  .canvas .group .svc{width:104px;}
+  .svc img{width:46px;height:46px;}
+  .svc .n{font-size:10px;font-weight:600;margin-top:5px;line-height:1.15;}
+  .svc .d{font-size:8.4px;color:#545B64;line-height:1.2;margin-top:2px;}
+  .step{position:absolute;width:20px;height:20px;border-radius:50%;background:#232F3E;color:#fff;font-size:10px;font-weight:bold;text-align:center;line-height:20px;z-index:6;}
+  .notes{position:absolute;left:1262px;top:118px;width:300px;font-size:10.4px;}
+  .notes h3{font-size:11.5px;margin:0 0 9px 0;}
+  .notes .row{display:flex;margin-bottom:9px;}
+  .notes .b{flex:0 0 20px;height:20px;border-radius:50%;background:#232F3E;color:#fff;font-size:10px;font-weight:bold;text-align:center;line-height:20px;margin-right:8px;}
+  .notes .b.dep{background:#7D8998;}
+  .notes .x{flex:1;line-height:1.35;}
+  .tag{position:absolute;font-size:8.6px;color:#545B64;background:#fff;padding:0 3px;z-index:5;}
+  .foot{position:absolute;left:30px;bottom:14px;font-size:9px;color:#879196;}
+  svg.lines{position:absolute;left:0;top:0;width:1600px;height:1000px;pointer-events:none;}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="title">VoiceShop: visual-first voice shopping with Strands Decider and Amazon Nova 2.5 Sonic</div>
+  <div class="subtitle">One spoken sentence, from microphone to shelf. Strands Decider answers typed questions with calibrated confidences; code applies the hard filters and acts or asks one question. Every call between services is IAM-authenticated (SigV4); the search collection is private, reachable only through its VPC endpoint.</div>
+
+  <!-- AWS account -->
+  <div class="boundary" style="left:200px;top:92px;width:1040px;height:860px;"></div>
+  <div class="boundary-label" style="left:220px;top:80px;">AWS account (us-east-1)</div>
+
+  <!-- Shopper -->
+  <div class="svc" style="left:60px;top:160px;"><img src="icons/user.svg"/><div class="n">Shopper's browser</div><div class="d">mic, shelf, chips,<br/>numbered cards</div></div>
+
+  <!-- Row A: runtime path -->
+  <div class="group" style="left:225px;top:130px;width:240px;height:160px;background:#F1F8FF;">
+    <div class="group-label" style="left:10px;top:-9px;">Sign-in and hosting</div>
+    <div class="svc" style="left:12px;top:30px;"><img src="icons/amplify.svg"/><div class="n">AWS Amplify Hosting</div><div class="d">serves the React app</div></div>
+    <div class="svc" style="left:124px;top:30px;"><img src="icons/cognito.svg"/><div class="n">Amazon Cognito</div><div class="d">user pool +<br/>identity pool</div></div>
+  </div>
+  <div class="group" style="left:495px;top:130px;width:150px;height:160px;background:#FDF0E7;">
+    <div class="group-label" style="left:10px;top:-9px;">Session host</div>
+    <div class="svc" style="left:23px;top:30px;"><img src="icons/agentcore.svg"/><div class="n">AgentCore Runtime</div><div class="d">one microVM per session;<br/>turn pipeline + policy</div></div>
+  </div>
+  <div class="group" style="left:675px;top:130px;width:150px;height:160px;background:#EBF8F3;">
+    <div class="group-label" style="left:10px;top:-9px;">Speech</div>
+    <div class="svc" style="left:23px;top:30px;"><img src="icons/nova.svg"/><div class="n">Amazon Nova 2.5 Sonic</div><div class="d">on Amazon Bedrock;<br/>always listens</div></div>
+  </div>
+  <div class="group" style="left:855px;top:130px;width:360px;height:160px;background:#F9ECF6;">
+    <div class="group-label" style="left:10px;top:-9px;">Decision model</div>
+    <div class="svc" style="left:80px;top:30px;width:200px;"><img src="icons/sagemaker.svg"/><div class="n">Amazon SageMaker AI</div><div class="d">Strands Decider 2B, real-time<br/>endpoint, ml.g5.xlarge,<br/>auto-scaling, network isolation</div></div>
+  </div>
+
+  <!-- Row B -->
+  <div class="group" style="left:225px;top:360px;width:240px;height:160px;background:#FDF0E7;">
+    <div class="group-label" style="left:10px;top:-9px;">Memory</div>
+    <div class="svc" style="left:68px;top:30px;"><img src="icons/agentcore.svg"/><div class="n">AgentCore Memory</div><div class="d">shopper preferences<br/>across visits</div></div>
+  </div>
+  <div class="group" style="left:495px;top:360px;width:330px;height:160px;background:#F1F8FF;">
+    <div class="group-label" style="left:10px;top:-9px;">Tools</div>
+    <div class="svc" style="left:23px;top:30px;"><img src="icons/agentcore.svg"/><div class="n">AgentCore Gateway</div><div class="d">MCP, IAM inbound auth</div></div>
+    <div class="svc" style="left:200px;top:30px;"><img src="icons/lambda.svg"/><div class="n">AWS Lambda</div><div class="d">five tools; search_catalog<br/>runs in the VPC</div></div>
+  </div>
+
+  <!-- VPC: the two functions that reach the search collection, and the endpoints -->
+  <div class="vpc" style="left:225px;top:590px;width:250px;height:160px;">
+    <div class="vpc-label" style="left:60px;top:-10px;"><img src="icons/vpc.svg"/>VPC (1 zone here; 2+ in production)</div>
+    <div class="svc" style="left:8px;top:28px;width:116px;"><img src="icons/lambda.svg"/><div class="n">search_catalog,<br/>index writer</div><div class="d">Lambda functions in an<br/>isolated subnet, no<br/>internet route</div></div>
+    <div class="svc" style="left:128px;top:28px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch Serverless,<br/>Bedrock runtime,<br/>S3 (gateway)</div></div>
+  </div>
+
+  <!-- Row C -->
+  <div class="group" style="left:495px;top:590px;width:720px;height:160px;background:#EBF8F3;">
+    <div class="group-label" style="left:10px;top:-9px;">Catalog, cart and orders</div>
+    <div class="svc" style="left:30px;top:30px;"><img src="icons/opensearch.svg"/><div class="n">OpenSearch Serverless</div><div class="d">vector search + hard filters;<br/>VPC endpoint only</div></div>
+    <div class="svc" style="left:200px;top:30px;"><img src="icons/bedrock.svg"/><div class="n">Titan Text Embeddings V2</div><div class="d">on Amazon Bedrock</div></div>
+    <div class="svc" style="left:400px;top:30px;"><img src="icons/dynamodb.svg"/><div class="n">Amazon DynamoDB</div><div class="d">Products, Sessions,<br/>Cart, Orders</div></div>
+    <div class="svc" style="left:580px;top:30px;"><img src="icons/s3.svg"/><div class="n">Amazon S3</div><div class="d">private product images</div></div>
+  </div>
+
+  <!-- Deploy-time band -->
+  <div class="group" style="left:225px;top:790px;width:330px;height:140px;background:#F4F5F6;">
+    <div class="group-label" style="left:10px;top:-9px;">Catalog load (deploy time)</div>
+    <div class="svc" style="left:12px;top:28px;"><img src="icons/s3.svg"/><div class="n">Catalog zip</div><div class="d">2,500 generated products,<br/>in the repository</div></div>
+    <div class="svc" style="left:190px;top:28px;"><img src="icons/codebuild.svg"/><div class="n">AWS CodeBuild</div><div class="d">loads S3 and DynamoDB;<br/>index writer (VPC) fills<br/>the search index</div></div>
+  </div>
+  <div class="group" style="left:585px;top:790px;width:300px;height:140px;background:#F4F5F6;">
+    <div class="group-label" style="left:10px;top:-9px;">Image builds (deploy time)</div>
+    <div class="svc" style="left:20px;top:28px;"><img src="icons/codebuild.svg"/><div class="n">AWS CodeBuild</div><div class="d">session host (ARM64),<br/>decider (x86_64)</div></div>
+    <div class="svc" style="left:170px;top:28px;"><img src="icons/ecr.svg"/><div class="n">Amazon ECR</div><div class="d">container images</div></div>
+  </div>
+  <div class="group" style="left:915px;top:790px;width:300px;height:140px;background:#F4F5F6;">
+    <div class="group-label" style="left:10px;top:-9px;">Operations and security</div>
+    <div class="svc" style="left:20px;top:28px;"><img src="icons/cloudwatch.svg"/><div class="n">Amazon CloudWatch</div><div class="d">logs, per-turn records,<br/>latency metrics</div></div>
+    <div class="svc" style="left:170px;top:28px;"><img src="icons/iam.svg"/><div class="n">AWS IAM</div><div class="d">one least-privilege role<br/>per component</div></div>
+  </div>
+
+  <!-- Connections -->
+  <svg class="lines">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#232F3E"/></marker>
+      <marker id="arrv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8C4FFF"/></marker>
+      <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7D8998"/></marker>
+    </defs>
+    <path d="M140 183 H262" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
+    <path d="M112 160 V112 H570 V156" stroke="#232F3E" stroke-width="1.8" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <path d="M596 183 H722" stroke="#232F3E" stroke-width="1.6" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <path d="M588 160 V146 H1035 V156" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
+    <path d="M570 252 V386" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
+    <path d="M532 252 V326 H345 V386" stroke="#232F3E" stroke-width="1.3" fill="none" marker-end="url(#arr)"/>
+    <path d="M596 413 H720" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
+    <path d="M747 488 V588" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
+    <path d="M603 643 H720" stroke="#232F3E" stroke-width="1.2" fill="none" marker-end="url(#arr)"/>
+    <path d="M1127 618 V556 H112 V250" stroke="#232F3E" stroke-width="1.3" stroke-dasharray="5,4" fill="none" marker-end="url(#arr)"/>
+    <path d="M700 520 V538 H265 V586" stroke="#8C4FFF" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrv)"/>
+    <path d="M440 626 H518" stroke="#8C4FFF" stroke-width="1.8" fill="none" marker-end="url(#arrv)"/>
+    <path d="M315 841 H441" stroke="#7D8998" stroke-width="1.5" fill="none" marker-end="url(#arrg)"/>
+    <path d="M683 841 H781" stroke="#7D8998" stroke-width="1.5" fill="none" marker-end="url(#arrg)"/>
+  </svg>
+
+  <div class="tag" style="left:250px;top:105px;">SigV4 WebSocket: audio, text, UI events</div>
+  <div class="tag" style="left:840px;top:139px;">InvokeEndpoint: typed questions</div>
+  <div class="tag" style="left:578px;top:300px;">MCP tool calls</div>
+  <div class="tag" style="left:380px;top:319px;">preferences</div>
+  <div class="tag" style="left:755px;top:540px;">search (VPC endpoint), detail, cart, orders</div>
+  <div class="tag" style="left:1000px;top:549px;">presigned image URLs</div>
+  <div class="tag" style="left:612px;top:646px;">embed query</div>
+  <div class="tag" style="left:400px;top:531px;color:#5A2BB5;">search_catalog runs here</div>
+  <div class="tag" style="left:447px;top:609px;color:#5A2BB5;">private</div>
+
+  <div class="step" style="left:190px;top:172px;">1</div>
+  <div class="step" style="left:470px;top:102px;">2</div>
+  <div class="step" style="left:648px;top:172px;">3</div>
+  <div class="step" style="left:1045px;top:136px;">4</div>
+  <div class="step" style="left:559px;top:318px;">5</div>
+  <div class="step" style="left:736px;top:556px;">6</div>
+  <div class="step" style="left:101px;top:420px;">7</div>
+
+  <div class="notes">
+    <h3>One spoken sentence</h3>
+    <div class="row"><div class="b">1</div><div class="x">The shopper signs in with Cognito; the Identity Pool gives the browser temporary credentials for one thing only: the session host WebSocket.</div></div>
+    <div class="row"><div class="b">2</div><div class="x">The browser opens a SigV4-signed WebSocket to the session host on AgentCore Runtime and streams mic audio (or typed text).</div></div>
+    <div class="row"><div class="b">3</div><div class="x">Nova 2.5 Sonic transcribes; it speaks only with Voice on, or to ask a yes/no question. Partial transcripts start a speculative catalog search; the final one starts the turn.</div></div>
+    <div class="row"><div class="b">4</div><div class="x">The host asks Strands Decider typed questions: intent, who it is for, department, then category within it, budget, which card. Each answer has a calibrated confidence: act, ask one question, or offer a yes/no.</div></div>
+    <div class="row"><div class="b">5</div><div class="x">Tools run through AgentCore Gateway to five Lambda functions. Code enforces every committed filter. Memory keeps preferences for the next visit.</div></div>
+    <div class="row"><div class="b">6</div><div class="x">search_catalog runs in a VPC: it embeds the query with Titan and runs a filtered vector search in OpenSearch Serverless through the collection's VPC endpoint. The cart and orders are DynamoDB transactions.</div></div>
+    <div class="row"><div class="b">7</div><div class="x">Chips and the shelf update first (about 1 s); product images arrive as presigned S3 URLs.</div></div>
+    <h3 style="margin-top:14px;">Deploy time</h3>
+    <div class="row"><div class="b dep">D</div><div class="x">deploy-all.sh builds the images in CodeBuild (no local Docker), creates the endpoint, and loads the generated catalog from the repository zip; a function inside the VPC writes the search index.</div></div>
+  </div>
+
+  <div class="foot">VoiceShop sample. Every product, brand and image in the catalog is generated. Icons: AWS Architecture Icons.</div>
+</div>
+</body>
+</html>

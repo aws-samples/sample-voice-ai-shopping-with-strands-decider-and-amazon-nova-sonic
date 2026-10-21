@@ -1,0 +1,12 @@
+# VoiceShop-CatalogCuration: loads the synthetic catalog that ships in this
+# package (catalog/*.zip) into S3, DynamoDB and OpenSearch Serverless.
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - pip install --quiet -r requirements.txt
+  build:
+    commands:
+      - python3 -u curate.py

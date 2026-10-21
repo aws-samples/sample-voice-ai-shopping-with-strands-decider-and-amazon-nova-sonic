@@ -1,0 +1,19 @@
+version: 0.2
+# ARM64 image for the session host. IMAGE_TAG is a content hash of the agent
+# sources, set by the CDK app on the project (cdk/lib/source-hash.ts).
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${ECR_REPOSITORY_URI%%/*}"
+      - |
+        if aws ecr describe-images --repository-name "${ECR_REPOSITORY_URI##*/}" --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
+          echo "Image ${IMAGE_TAG} already in ECR, skipping build."; SKIP_BUILD=1
+        fi
+  build:
+    commands:
+      - |
+        if [ -z "${SKIP_BUILD:-}" ]; then
+          docker build -t "${ECR_REPOSITORY_URI}:${IMAGE_TAG}" .
+          docker push "${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
+        fi
+      - echo "Image ready ${ECR_REPOSITORY_URI}:${IMAGE_TAG}"

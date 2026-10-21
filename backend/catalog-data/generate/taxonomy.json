@@ -1,0 +1,1319 @@
+{
+ "_comment": "VoiceShop synthetic catalog taxonomy: 10 departments x 5 categories. genders are the shopper groups a category's products may target (women, men, unisex, girls, boys). price is the USD range for generated products. ideas seed the variety of products the generator writes; materials are typical, not exhaustive.  photo \"device\" shows the screen switched off (a lit screen shows digits, which image QA rejects as text); photo \"apparel\" asks for a flat lay or ghost mannequin, never a person wearing it.",
+ "departments": [
+  {
+   "id": "womens-clothing",
+   "label": "Women's Clothing",
+   "categories": [
+    {
+     "id": "dresses",
+     "label": "Dresses",
+     "genders": [
+      "women"
+     ],
+     "price": [
+      25,
+      180
+     ],
+     "materials": [
+      "cotton",
+      "linen",
+      "silk",
+      "polyester",
+      "viscose"
+     ],
+     "ideas": [
+      "wrap dress",
+      "maxi dress",
+      "shirt dress",
+      "cocktail dress",
+      "sundress",
+      "sweater dress"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "womens-tops",
+     "label": "Tops",
+     "genders": [
+      "women"
+     ],
+     "price": [
+      15,
+      90
+     ],
+     "materials": [
+      "cotton",
+      "silk",
+      "linen",
+      "modal",
+      "polyester"
+     ],
+     "ideas": [
+      "blouse",
+      "tank top",
+      "tunic",
+      "camisole",
+      "button-down shirt",
+      "embroidered kurta top"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "skirts",
+     "label": "Skirts",
+     "genders": [
+      "women"
+     ],
+     "price": [
+      20,
+      110
+     ],
+     "materials": [
+      "cotton",
+      "denim",
+      "wool",
+      "satin",
+      "polyester"
+     ],
+     "ideas": [
+      "pleated midi skirt",
+      "denim mini skirt",
+      "wrap skirt",
+      "pencil skirt",
+      "tiered maxi skirt"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "womens-jeans",
+     "label": "Jeans",
+     "genders": [
+      "women"
+     ],
+     "price": [
+      30,
+      140
+     ],
+     "materials": [
+      "denim",
+      "stretch denim"
+     ],
+     "ideas": [
+      "high-rise skinny jeans",
+      "wide-leg jeans",
+      "mom jeans",
+      "bootcut jeans",
+      "cropped flare jeans"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "knitwear",
+     "label": "Knitwear",
+     "genders": [
+      "women",
+      "unisex"
+     ],
+     "price": [
+      30,
+      160
+     ],
+     "materials": [
+      "merino wool",
+      "cashmere",
+      "cotton",
+      "acrylic"
+     ],
+     "ideas": [
+      "crewneck sweater",
+      "cardigan",
+      "turtleneck",
+      "cable-knit jumper",
+      "knit vest"
+     ],
+     "photo": "apparel"
+    }
+   ]
+  },
+  {
+   "id": "mens-clothing",
+   "label": "Men's Clothing",
+   "categories": [
+    {
+     "id": "mens-shirts",
+     "label": "Shirts",
+     "genders": [
+      "men"
+     ],
+     "price": [
+      25,
+      120
+     ],
+     "materials": [
+      "cotton",
+      "linen",
+      "oxford cloth",
+      "flannel"
+     ],
+     "ideas": [
+      "oxford button-down",
+      "linen shirt",
+      "flannel shirt",
+      "dress shirt",
+      "kurta shirt"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "mens-tshirts",
+     "label": "T-Shirts",
+     "genders": [
+      "men",
+      "unisex"
+     ],
+     "price": [
+      12,
+      45
+     ],
+     "materials": [
+      "cotton",
+      "organic cotton",
+      "cotton blend"
+     ],
+     "ideas": [
+      "crew-neck tee",
+      "graphic tee",
+      "henley",
+      "pocket tee",
+      "long-sleeve tee"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "trousers",
+     "label": "Trousers",
+     "genders": [
+      "men"
+     ],
+     "price": [
+      30,
+      130
+     ],
+     "materials": [
+      "cotton twill",
+      "wool blend",
+      "linen",
+      "denim"
+     ],
+     "ideas": [
+      "chinos",
+      "slim jeans",
+      "cargo pants",
+      "linen trousers",
+      "dress trousers"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "mens-jackets",
+     "label": "Jackets",
+     "genders": [
+      "men",
+      "unisex"
+     ],
+     "price": [
+      50,
+      260
+     ],
+     "materials": [
+      "nylon",
+      "leather",
+      "denim",
+      "wool",
+      "down"
+     ],
+     "ideas": [
+      "puffer jacket",
+      "bomber jacket",
+      "denim jacket",
+      "rain shell",
+      "leather jacket"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "suits",
+     "label": "Suits & Blazers",
+     "genders": [
+      "men"
+     ],
+     "price": [
+      90,
+      450
+     ],
+     "materials": [
+      "wool",
+      "linen",
+      "polyester blend"
+     ],
+     "ideas": [
+      "two-piece suit",
+      "blazer",
+      "waistcoat",
+      "tuxedo jacket",
+      "nehru jacket"
+     ],
+     "photo": "apparel"
+    }
+   ]
+  },
+  {
+   "id": "kids-teens",
+   "label": "Kids & Teens",
+   "categories": [
+    {
+     "id": "boys-tops",
+     "label": "Boys' Tops",
+     "genders": [
+      "boys"
+     ],
+     "price": [
+      10,
+      40
+     ],
+     "materials": [
+      "cotton",
+      "cotton blend",
+      "polyester"
+     ],
+     "ideas": [
+      "graphic tee for boys",
+      "polo shirt",
+      "hoodie",
+      "long-sleeve tee",
+      "festive kurta"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "girls-dresses",
+     "label": "Girls' Dresses",
+     "genders": [
+      "girls"
+     ],
+     "price": [
+      15,
+      60
+     ],
+     "materials": [
+      "cotton",
+      "tulle",
+      "polyester",
+      "linen"
+     ],
+     "ideas": [
+      "party dress",
+      "tutu dress",
+      "sundress",
+      "smocked dress",
+      "festive lehenga set"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "kids-outerwear",
+     "label": "Kids' Outerwear",
+     "genders": [
+      "boys",
+      "girls"
+     ],
+     "price": [
+      25,
+      90
+     ],
+     "materials": [
+      "nylon",
+      "fleece",
+      "down",
+      "polyester"
+     ],
+     "ideas": [
+      "puffer coat",
+      "rain jacket",
+      "fleece jacket",
+      "snow suit",
+      "windbreaker"
+     ],
+     "photo": "apparel"
+    },
+    {
+     "id": "school-bags",
+     "label": "School Bags",
+     "genders": [
+      "boys",
+      "girls"
+     ],
+     "price": [
+      15,
+      70
+     ],
+     "materials": [
+      "polyester",
+      "nylon",
+      "canvas"
+     ],
+     "ideas": [
+      "school backpack",
+      "lunch bag",
+      "pencil case",
+      "rolling backpack",
+      "sling bag"
+     ]
+    },
+    {
+     "id": "teen-streetwear",
+     "label": "Teen Streetwear",
+     "genders": [
+      "boys",
+      "girls"
+     ],
+     "price": [
+      15,
+      75
+     ],
+     "materials": [
+      "cotton",
+      "fleece",
+      "denim",
+      "polyester"
+     ],
+     "ideas": [
+      "oversized graphic tee",
+      "hoodie",
+      "joggers",
+      "bucket hat",
+      "cropped jacket",
+      "puzzle-cube print tee"
+     ],
+     "photo": "apparel"
+    }
+   ]
+  },
+  {
+   "id": "shoes",
+   "label": "Shoes",
+   "categories": [
+    {
+     "id": "sneakers",
+     "label": "Sneakers",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      40,
+      180
+     ],
+     "materials": [
+      "mesh",
+      "leather",
+      "canvas",
+      "suede"
+     ],
+     "ideas": [
+      "running shoe",
+      "canvas low-top",
+      "leather court sneaker",
+      "high-top sneaker",
+      "slip-on sneaker"
+     ]
+    },
+    {
+     "id": "boots",
+     "label": "Boots",
+     "genders": [
+      "women",
+      "men"
+     ],
+     "price": [
+      60,
+      260
+     ],
+     "materials": [
+      "leather",
+      "suede",
+      "rubber"
+     ],
+     "ideas": [
+      "chelsea boot",
+      "hiking boot",
+      "ankle boot",
+      "rain boot",
+      "knee-high boot"
+     ]
+    },
+    {
+     "id": "sandals",
+     "label": "Sandals",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      20,
+      110
+     ],
+     "materials": [
+      "leather",
+      "rubber",
+      "cork",
+      "textile"
+     ],
+     "ideas": [
+      "slide sandal",
+      "strappy sandal",
+      "sport sandal",
+      "flip-flop",
+      "kolhapuri sandal"
+     ]
+    },
+    {
+     "id": "formal-shoes",
+     "label": "Formal Shoes",
+     "genders": [
+      "women",
+      "men"
+     ],
+     "price": [
+      60,
+      240
+     ],
+     "materials": [
+      "leather",
+      "patent leather",
+      "suede"
+     ],
+     "ideas": [
+      "oxford",
+      "loafer",
+      "derby",
+      "pump",
+      "ballet flat"
+     ]
+    },
+    {
+     "id": "kids-shoes",
+     "label": "Kids' Shoes",
+     "genders": [
+      "boys",
+      "girls"
+     ],
+     "price": [
+      20,
+      70
+     ],
+     "materials": [
+      "mesh",
+      "canvas",
+      "leather",
+      "rubber"
+     ],
+     "ideas": [
+      "light-up sneaker",
+      "school shoe",
+      "velcro sneaker",
+      "kids sandal",
+      "rain boot"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bags-accessories",
+   "label": "Bags & Accessories",
+   "categories": [
+    {
+     "id": "handbags",
+     "label": "Handbags",
+     "genders": [
+      "women"
+     ],
+     "price": [
+      35,
+      280
+     ],
+     "materials": [
+      "leather",
+      "vegan leather",
+      "canvas",
+      "suede"
+     ],
+     "ideas": [
+      "crossbody bag",
+      "tote bag",
+      "shoulder bag",
+      "clutch",
+      "bucket bag"
+     ]
+    },
+    {
+     "id": "backpacks",
+     "label": "Backpacks",
+     "genders": [
+      "unisex",
+      "women",
+      "men"
+     ],
+     "price": [
+      30,
+      160
+     ],
+     "materials": [
+      "nylon",
+      "canvas",
+      "leather",
+      "polyester"
+     ],
+     "ideas": [
+      "laptop backpack",
+      "travel backpack",
+      "mini backpack",
+      "roll-top backpack",
+      "hiking daypack"
+     ]
+    },
+    {
+     "id": "wallets",
+     "label": "Wallets",
+     "genders": [
+      "men",
+      "women",
+      "unisex"
+     ],
+     "price": [
+      15,
+      110
+     ],
+     "materials": [
+      "leather",
+      "vegan leather",
+      "canvas"
+     ],
+     "ideas": [
+      "bifold wallet",
+      "card holder",
+      "zip-around wallet",
+      "travel wallet",
+      "coin purse"
+     ]
+    },
+    {
+     "id": "belts",
+     "label": "Belts",
+     "genders": [
+      "men",
+      "women"
+     ],
+     "price": [
+      15,
+      90
+     ],
+     "materials": [
+      "leather",
+      "canvas",
+      "braided leather"
+     ],
+     "ideas": [
+      "leather dress belt",
+      "reversible belt",
+      "braided belt",
+      "canvas web belt",
+      "chain belt"
+     ]
+    },
+    {
+     "id": "scarves-hats",
+     "label": "Scarves & Hats",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      12,
+      80
+     ],
+     "materials": [
+      "wool",
+      "cashmere",
+      "cotton",
+      "silk",
+      "straw"
+     ],
+     "ideas": [
+      "wool scarf",
+      "silk scarf",
+      "beanie",
+      "baseball cap",
+      "sun hat",
+      "pashmina shawl"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "jewelry-watches",
+   "label": "Jewelry & Watches",
+   "categories": [
+    {
+     "id": "necklaces",
+     "label": "Necklaces",
+     "genders": [
+      "women",
+      "unisex"
+     ],
+     "price": [
+      20,
+      250
+     ],
+     "materials": [
+      "sterling silver",
+      "gold-plated brass",
+      "stainless steel",
+      "pearl"
+     ],
+     "ideas": [
+      "pendant necklace",
+      "chain necklace",
+      "pearl strand",
+      "choker",
+      "layered necklace"
+     ]
+    },
+    {
+     "id": "earrings",
+     "label": "Earrings",
+     "genders": [
+      "women",
+      "girls"
+     ],
+     "price": [
+      12,
+      180
+     ],
+     "materials": [
+      "sterling silver",
+      "gold-plated brass",
+      "pearl",
+      "enamel"
+     ],
+     "ideas": [
+      "stud earrings",
+      "hoop earrings",
+      "drop earrings",
+      "jhumka earrings",
+      "huggie earrings"
+     ]
+    },
+    {
+     "id": "bracelets",
+     "label": "Bracelets",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      15,
+      200
+     ],
+     "materials": [
+      "sterling silver",
+      "leather",
+      "beads",
+      "stainless steel"
+     ],
+     "ideas": [
+      "charm bracelet",
+      "bangle set",
+      "beaded bracelet",
+      "leather cuff",
+      "tennis bracelet"
+     ]
+    },
+    {
+     "id": "rings",
+     "label": "Rings",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      15,
+      220
+     ],
+     "materials": [
+      "sterling silver",
+      "gold-plated brass",
+      "titanium",
+      "stainless steel"
+     ],
+     "ideas": [
+      "stacking ring",
+      "signet ring",
+      "band ring",
+      "cocktail ring",
+      "birthstone ring"
+     ]
+    },
+    {
+     "id": "watches",
+     "label": "Watches",
+     "genders": [
+      "women",
+      "men",
+      "unisex",
+      "boys",
+      "girls"
+     ],
+     "price": [
+      25,
+      350
+     ],
+     "materials": [
+      "stainless steel",
+      "leather",
+      "silicone",
+      "titanium"
+     ],
+     "ideas": [
+      "chronograph",
+      "minimalist dress watch",
+      "dive watch",
+      "kids digital watch",
+      "field watch"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "toys-games",
+   "label": "Toys & Games",
+   "categories": [
+    {
+     "id": "puzzles-cubes",
+     "label": "Puzzles & Cubes",
+     "genders": [
+      "unisex",
+      "boys",
+      "girls"
+     ],
+     "price": [
+      8,
+      60
+     ],
+     "materials": [
+      "ABS plastic",
+      "wood",
+      "cardboard"
+     ],
+     "ideas": [
+      "3x3 speed cube",
+      "4x4 speed cube",
+      "pyramid twist puzzle",
+      "1000-piece jigsaw puzzle",
+      "wooden brain teaser",
+      "magnetic speed cube"
+     ]
+    },
+    {
+     "id": "board-games",
+     "label": "Board Games",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      15,
+      70
+     ],
+     "materials": [
+      "cardboard",
+      "wood",
+      "plastic"
+     ],
+     "ideas": [
+      "strategy board game",
+      "family party game",
+      "card game",
+      "chess set",
+      "cooperative adventure game"
+     ]
+    },
+    {
+     "id": "building-sets",
+     "label": "Building Sets",
+     "genders": [
+      "unisex",
+      "boys",
+      "girls"
+     ],
+     "price": [
+      15,
+      150
+     ],
+     "materials": [
+      "ABS plastic",
+      "wood",
+      "metal"
+     ],
+     "ideas": [
+      "brick building set",
+      "robotics kit",
+      "magnetic tiles",
+      "wooden blocks",
+      "model car kit"
+     ]
+    },
+    {
+     "id": "plush-toys",
+     "label": "Plush Toys",
+     "genders": [
+      "unisex",
+      "boys",
+      "girls"
+     ],
+     "price": [
+      10,
+      50
+     ],
+     "materials": [
+      "polyester plush",
+      "cotton",
+      "minky fabric"
+     ],
+     "ideas": [
+      "teddy bear",
+      "plush elephant",
+      "dinosaur plush",
+      "weighted plush",
+      "plush keychain"
+     ]
+    },
+    {
+     "id": "outdoor-toys",
+     "label": "Outdoor Toys",
+     "genders": [
+      "unisex",
+      "boys",
+      "girls"
+     ],
+     "price": [
+      12,
+      120
+     ],
+     "materials": [
+      "plastic",
+      "foam",
+      "nylon",
+      "wood"
+     ],
+     "ideas": [
+      "kite",
+      "foam blaster",
+      "frisbee",
+      "bubble machine",
+      "kick scooter"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "home-kitchen",
+   "label": "Home & Kitchen",
+   "categories": [
+    {
+     "id": "drinkware",
+     "label": "Mugs & Drinkware",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      10,
+      60
+     ],
+     "materials": [
+      "ceramic",
+      "stainless steel",
+      "glass",
+      "stoneware"
+     ],
+     "ideas": [
+      "ceramic mug",
+      "travel tumbler",
+      "glass tea set",
+      "insulated coffee cup",
+      "stoneware mug set"
+     ]
+    },
+    {
+     "id": "cookware",
+     "label": "Cookware",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      20,
+      220
+     ],
+     "materials": [
+      "stainless steel",
+      "cast iron",
+      "non-stick aluminum",
+      "copper"
+     ],
+     "ideas": [
+      "frying pan",
+      "saucepan set",
+      "cast iron skillet",
+      "dutch oven",
+      "kadai wok"
+     ]
+    },
+    {
+     "id": "bedding",
+     "label": "Bedding",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      30,
+      200
+     ],
+     "materials": [
+      "cotton",
+      "linen",
+      "bamboo",
+      "microfiber"
+     ],
+     "ideas": [
+      "duvet cover set",
+      "sheet set",
+      "quilt",
+      "throw blanket",
+      "pillow pair"
+     ]
+    },
+    {
+     "id": "lamps",
+     "label": "Lamps",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      25,
+      180
+     ],
+     "materials": [
+      "metal",
+      "ceramic",
+      "wood",
+      "rattan",
+      "glass"
+     ],
+     "ideas": [
+      "table lamp",
+      "floor lamp",
+      "desk lamp",
+      "pendant light",
+      "lantern"
+     ]
+    },
+    {
+     "id": "home-decor",
+     "label": "Home Decor",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      12,
+      150
+     ],
+     "materials": [
+      "ceramic",
+      "brass",
+      "wood",
+      "glass",
+      "wax"
+     ],
+     "ideas": [
+      "vase",
+      "scented candle",
+      "wall mirror",
+      "photo frame",
+      "brass diya set"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "electronics-accessories",
+   "label": "Electronics Accessories",
+   "categories": [
+    {
+     "id": "headphones",
+     "label": "Headphones",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      25,
+      300
+     ],
+     "materials": [
+      "plastic",
+      "aluminum",
+      "protein leather"
+     ],
+     "ideas": [
+      "over-ear headphones",
+      "wireless earbuds",
+      "kids headphones",
+      "sport earbuds",
+      "on-ear headphones"
+     ]
+    },
+    {
+     "id": "phone-cases",
+     "label": "Phone Cases",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      10,
+      60
+     ],
+     "materials": [
+      "silicone",
+      "TPU",
+      "leather",
+      "polycarbonate"
+     ],
+     "ideas": [
+      "clear case",
+      "wallet case",
+      "rugged case",
+      "silicone case",
+      "patterned case"
+     ]
+    },
+    {
+     "id": "chargers",
+     "label": "Chargers & Power",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      12,
+      90
+     ],
+     "materials": [
+      "plastic",
+      "aluminum",
+      "braided nylon"
+     ],
+     "ideas": [
+      "fast wall charger",
+      "power bank",
+      "wireless charging pad",
+      "braided charging cable",
+      "car charger"
+     ]
+    },
+    {
+     "id": "smartwatches",
+     "label": "Smartwatches & Trackers",
+     "genders": [
+      "unisex",
+      "women",
+      "men"
+     ],
+     "price": [
+      40,
+      350
+     ],
+     "materials": [
+      "aluminum",
+      "silicone",
+      "stainless steel"
+     ],
+     "ideas": [
+      "fitness tracker",
+      "smartwatch",
+      "kids smartwatch",
+      "sport band",
+      "sleep tracker ring"
+     ],
+     "photo": "device"
+    },
+    {
+     "id": "speakers",
+     "label": "Speakers",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      25,
+      250
+     ],
+     "materials": [
+      "plastic",
+      "fabric mesh",
+      "aluminum",
+      "wood"
+     ],
+     "ideas": [
+      "portable bluetooth speaker",
+      "smart speaker",
+      "waterproof speaker",
+      "bookshelf speaker",
+      "party speaker"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sports-beauty",
+   "label": "Sports & Beauty",
+   "categories": [
+    {
+     "id": "fitness",
+     "label": "Yoga & Fitness",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      15,
+      120
+     ],
+     "materials": [
+      "TPE",
+      "natural rubber",
+      "cork",
+      "neoprene",
+      "polyester"
+     ],
+     "ideas": [
+      "yoga mat",
+      "resistance band set",
+      "dumbbell pair",
+      "foam roller",
+      "leggings"
+     ]
+    },
+    {
+     "id": "cycling",
+     "label": "Cycling Gear",
+     "genders": [
+      "unisex",
+      "women",
+      "men"
+     ],
+     "price": [
+      15,
+      200
+     ],
+     "materials": [
+      "polycarbonate",
+      "lycra",
+      "aluminum",
+      "nylon"
+     ],
+     "ideas": [
+      "bike helmet",
+      "cycling gloves",
+      "bike light set",
+      "saddle bag",
+      "cycling jersey"
+     ]
+    },
+    {
+     "id": "water-bottles",
+     "label": "Water Bottles",
+     "genders": [
+      "unisex"
+     ],
+     "price": [
+      10,
+      50
+     ],
+     "materials": [
+      "stainless steel",
+      "Tritan plastic",
+      "glass"
+     ],
+     "ideas": [
+      "insulated bottle",
+      "kids bottle",
+      "sports squeeze bottle",
+      "glass bottle",
+      "collapsible bottle"
+     ]
+    },
+    {
+     "id": "skincare",
+     "label": "Skincare Sets",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      15,
+      120
+     ],
+     "materials": [
+      "glass jars",
+      "recycled plastic",
+      "aluminum tubes"
+     ],
+     "ideas": [
+      "moisturizer set",
+      "face serum trio",
+      "beard care kit",
+      "travel skincare kit",
+      "sunscreen duo"
+     ]
+    },
+    {
+     "id": "fragrance",
+     "label": "Fragrance",
+     "genders": [
+      "women",
+      "men",
+      "unisex"
+     ],
+     "price": [
+      25,
+      180
+     ],
+     "materials": [
+      "glass bottle"
+     ],
+     "ideas": [
+      "eau de parfum",
+      "attar oil",
+      "body mist",
+      "cologne",
+      "fragrance gift set"
+     ]
+    }
+   ]
+  }
+ ]
+}

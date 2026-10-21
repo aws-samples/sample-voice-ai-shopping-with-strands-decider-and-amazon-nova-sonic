@@ -1,0 +1,55 @@
+{
+  "_comment": "Per-question act/ask thresholds. intent, recipient, gender, budget_band and pointed_item were chosen by the earlier fashion-catalog evaluation (2026-10-18; its scripts were removed, the method is in docs/how-we-tuned-it.md) and re-checked on the synthetic catalog; department, category and offer_reply by eval/catalog/run_catalog_eval.py (2026-10-19): the lowest act threshold whose commit precision is >= 0.95 on the tuning split, with every higher one also >= 0.95, confirmed on the held-out split. Re-run whenever the questions, the catalog or the model change. Questions not listed use ACT_THRESHOLD / ASK_THRESHOLD.",
+  "targetPrecision": 0.95,
+  "questions": {
+    "intent": {
+      "act": 0.5,
+      "ask": 0.3,
+      "measured": "precision 0.984, recall 0.698. Synthetic catalog: actions other than narrowing at >= 0.5, tuning 11/11 right, held-out 4/4 (recall 0.69 / 1.00); below 0.5 wrong actions appear."
+    },
+    "recipient": {
+      "act": 0.5,
+      "ask": 0.3,
+      "measured": "precision 1.000, recall 0.939. Synthetic catalog: tuning 1.000 / 0.857, held-out 1.000 / 0.929."
+    },
+    "gender": {
+      "act": 0.5,
+      "ask": 0.3,
+      "measured": "precision 1.000, recall 0.964 (mostly implied by the recipient)"
+    },
+    "category": {
+      "act": 0.55,
+      "ask": 0.35,
+      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): at 0.55 tuning 1.000 / 0.864, held-out 1.000 / 0.857; one wrong commit at 0.52 (\"make it a skirt instead\" -> Jeans). At the old 0.85: recall 0.455."
+    },
+    "budget_band": {
+      "act": 0.65,
+      "ask": 0.4,
+      "measured": "precision 1.000, recall 0.167 (explicit amounts are parsed in code)"
+    },
+    "pointed_item": {
+      "act": 0.2,
+      "ask": 0.1,
+      "measured": "Pointing evaluation on the earlier catalog, 2026-10-18 (script removed): open precision >= 0.95 at 0.20 on the tuning set (36 cases x 3). Held-out (40 new sentences, watch shelf from the earlier catalog, 3 runs): 27 opened right, 5 opened wrong (row-relative phrases such as 'bottom right'), 4 confirmed by number, 4 asked. Between 0.10 and 0.20 the host asks 'Do you mean No. N ...?'"
+    },
+    "department": {
+      "act": 0.4,
+      "ask": 0.25,
+      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): no wrong commit at any threshold (56 answers); at 0.40 tuning 1.000 / 0.794, held-out 1.000 / 0.733 (at 0.60: recall 0.53 / 0.47)."
+    },
+    "offer_reply": {
+      "act": 0.65,
+      "ask": 0.35,
+      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): at 0.65 tuning 1.000 / 0.656, held-out 1.000 / 0.688; one wrong commit at 0.62 (\"maybe the earlier ones\" -> no)."
+    },
+    "cart_item": {
+      "act": 0.85,
+      "ask": 0.35,
+      "measured": "PROVISIONAL (2026-10-20): 6 removal sentences on the live endpoint named the right cart line at 0.93-0.97; the one wrong pick (\"the last thing I added\") was 0.43. Below act the host asks \"Should I remove ...?\""
+    }
+  },
+  "noMatch": {
+    "threshold": 0.35,
+    "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): none_of_these >= 0.35 flagged 2 of 61 fitting requests and 11 of 13 out-of-catalog ones on the tuning split, 0 of 26 and 5 of 6 held-out. At 0.135: 14 of 61 fitting requests flagged."
+  }
+}

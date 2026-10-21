@@ -1,0 +1,2 @@
+# Runtime dependency of curate.py (CodeBuild).
+boto3==1.43.114

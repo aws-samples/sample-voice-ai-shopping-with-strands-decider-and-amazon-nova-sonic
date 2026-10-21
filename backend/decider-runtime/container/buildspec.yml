@@ -1,0 +1,28 @@
+version: 0.2
+# Builds the SageMaker decider image (Dockerfile) and pushes it to ECR. The tag is
+# a content hash of this directory's build inputs, computed the same way by the
+# CDK app (cdk/lib/image-tag.ts), so a changed container always becomes a new
+# SageMaker model and an unchanged one is never rebuilt needlessly.
+
+# The strands-decider commit is pinned once, as the Dockerfile's ARG default, so
+# a version bump always changes the tag (and is never skipped as "already built").
+
+phases:
+  pre_build:
+    commands:
+      - IMAGE_TAG="sm-$(cat Dockerfile requirements.txt serve.py | sha256sum | cut -c1-12)"
+      - echo "Image tag ${IMAGE_TAG}"
+      - aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REPOSITORY_URI%%/*}"
+      - |
+        if aws ecr describe-images --repository-name "${ECR_REPOSITORY_URI##*/}" --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
+          echo "Image ${IMAGE_TAG} already in ECR, skipping build."
+          SKIP_BUILD=1
+        fi
+  build:
+    commands:
+      - |
+        if [ -z "${SKIP_BUILD:-}" ]; then
+          DOCKER_BUILDKIT=1 docker build -t "${ECR_REPOSITORY_URI}:${IMAGE_TAG}" .
+          docker push "${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
+        fi
+      - echo "Image ready ${ECR_REPOSITORY_URI}:${IMAGE_TAG}"

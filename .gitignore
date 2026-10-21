@@ -1,0 +1,50 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+
+# CDK
+cdk.out/
+cdk.context.json
+cdk-outputs/
+*.d.ts
+!jest.config.d.ts
+!frontend/src/vite-env.d.ts
+
+# Compiled TypeScript output in CDK apps (source lives alongside .ts)
+backend/**/bin/*.js
+backend/**/lib/*.js
+backend/**/test/*.js
+frontend/cdk/bin/*.js
+frontend/cdk/lib/*.js
+frontend/cdk/test/*.js
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Frontend build output
+frontend/dist/
+frontend/node_modules/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+build.log
+
+# AWS Architecture Icons, copied locally to render the diagram (not redistributed)
+assets/icons/
+
+# deploy-all.sh background log
+deploy-decider.log
+
+# Derived eval scores (run_catalog_eval.py score writes them next to the results)
+backend/agentcore-runtime/eval/catalog/*-score.json
