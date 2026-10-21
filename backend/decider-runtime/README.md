@@ -4,7 +4,7 @@ The decision model behind every sentence: Strands Decider 2B (Qwen3.5-2B base pl
 
 | Piece | What it is |
 |---|---|
-| `container/` | Multi-stage x86_64 image: CUDA/PyTorch environment baked in, `serve.py` serves `/ping` (200 once the model is loaded) and `/invocations` (→ the decider's `/v1/systemone`). Built by CodeBuild; tagged `sm-<content hash>` |
+| `container/` | x86_64 image on the AWS Deep Learning Containers base image (Amazon ECR Public): CUDA/PyTorch environment baked in, `serve.py` serves `/ping` (200 once the model is loaded) and `/invocations` (→ the decider's `/v1/systemone`). Built by CodeBuild; tagged `sm-<content hash>` |
 | `cdk/` | `VoiceShop-DeciderInfraStack` (ECR, CodeBuild, model bucket) and `VoiceShop-DeciderEndpointStack` (model with network isolation and no VPC (ADR-26), endpoint, auto-scaling, the in-Region `VoiceShop-DeciderMeasure` project) |
 | `scripts/` | `prewarm.py` (deploy check), `measure-latency.py` (run in-Region by the `VoiceShop-DeciderMeasure` CodeBuild project), the `best_fit` / `no_match` study behind ADR-21 used a script that was written for the earlier catalog and has been removed; `backend/agentcore-runtime/eval/catalog` is the current method |
 

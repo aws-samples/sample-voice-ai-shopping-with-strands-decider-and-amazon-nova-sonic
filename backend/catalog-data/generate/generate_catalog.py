@@ -97,7 +97,7 @@ def taxonomy(selected: list[str] | None) -> list[dict]:
 
 def product_id(category: str, index: int) -> str:
     """10 characters, A-Z0-9, stable for a category and position (the session host's id format)."""
-    return 'V' + hashlib.sha1(f'{category}:{index}'.encode()).hexdigest()[:9].upper()
+    return 'V' + hashlib.sha1(f'{category}:{index}'.encode(), usedforsecurity=False).hexdigest()[:9].upper()
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -213,7 +213,7 @@ def stage_specs(args, cats: list[dict], targets: dict[str, int] | None = None) -
 
 # -------------------------------------------------------------------- images
 def draw(client, spec: dict, attempt: int) -> bytes:
-    seed = int(hashlib.sha1(f"{spec['id']}:{attempt}".encode()).hexdigest()[:8], 16)
+    seed = int(hashlib.sha1(f"{spec['id']}:{attempt}".encode(), usedforsecurity=False).hexdigest()[:8], 16)
     extra = {'apparel': APPAREL_STYLE, 'device': DEVICE_STYLE}.get(spec.get('photo'))
     style = f"{extra}, {PHOTO_STYLE}" if extra else PHOTO_STYLE
     body = {'prompt': f"{spec['image_prompt']}. {style}", 'negative_prompt': NEGATIVE,

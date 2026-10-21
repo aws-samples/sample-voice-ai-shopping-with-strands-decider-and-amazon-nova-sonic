@@ -330,6 +330,8 @@ Builds still run outside the CDK deploy path with a 60-minute timeout, since the
 
 **Amendment (2026-10-19).** The capacity provider's persistent EBS volume no longer exists. On SageMaker (ADR-22) the CUDA/PyTorch environment is baked into the image again (no 2 GB cap), and the model files are mounted read-only from the model bucket at `/opt/ml/model`. The image is still x86_64 and built by CodeBuild.
 
+**Amendment (2026-10-20): base image from Amazon ECR.** Container base images must come from ECR, not external registries, so the image no longer builds from `nvcr.io/nvidia/cuda` (12.4.1 devel + runtime). It is one stage on the AWS Deep Learning Containers base image on Amazon ECR Public (`deep-learning-containers/base`, CUDA 12.9 toolkit, Python 3.12, Ubuntu 22.04), which supplies nvcc for `causal-conv1d`. Torch still uses its cu126 wheels, which bundle the CUDA runtime.
+
 **Evidence.** research.md section [5](research.md#5-agentcore-runtime-instances-gpu) (drivers provided, standard CUDA image works); the [Measurements](research.md#measurements) section records the 2 GB cap and the 10.1 GB measured image size that triggered this revision.
 
 ---

@@ -123,7 +123,9 @@ def main() -> int:
     prepare_hf_cache()
     app = build_app()
     # One worker: the model owns the GPU (strands_decider.server's own serve() does the same).
-    uvicorn.run(app, host="0.0.0.0", port=8080, workers=1, log_level="info")
+    # SageMaker reaches the container on port 8080 from outside it; the endpoint runs with
+    # network isolation, so binding all interfaces exposes nothing beyond SageMaker itself.
+    uvicorn.run(app, host="0.0.0.0", port=8080, workers=1, log_level="info")  # nosec B104
     return 0
 
 

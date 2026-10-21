@@ -225,4 +225,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '8080')), log_level='info')
+    # AgentCore Runtime reaches the container on port 8080 from outside it; the microVM is
+    # reachable only through AgentCore with SigV4, so binding all interfaces is required.
+    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '8080')), log_level='info')  # nosec B104
