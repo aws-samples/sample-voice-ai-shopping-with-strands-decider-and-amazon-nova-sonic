@@ -1,4 +1,4 @@
-# Voice AI Shopping with Strands Decider and Amazon Nova Sonic
+# Build a Decision-Model-First Retail Experience on AWS
 
 ## Table of Contents
 
@@ -72,37 +72,37 @@ The session host (Python, FastAPI) runs the turn pipeline and the decision polic
 
 ### Cost
 
-You are responsible for the cost of the AWS services used while running this sample. As of October 2026, running it with the default settings in the US East (N. Virginia) Region costs approximately $1,281 per month for 3,000 shopping sessions. About 95% of that is fixed: the GPU instance behind the decider endpoint and the OpenSearch Serverless minimum both bill for every hour the sample is deployed, whether or not anyone is shopping. **Run `./cleanup-all.sh` when you finish testing or recording.**
+You are responsible for the cost of the AWS services used while running this sample. As of October 2026, running it with the default settings in the US East (N. Virginia) Region costs approximately $1,297 per month for 3,000 shopping sessions. About 94% of that is fixed: the GPU instance behind the decider endpoint and the OpenSearch Serverless minimum both bill for every hour the sample is deployed, whether or not anyone is shopping. **Run `./cleanup-all.sh` when you finish testing or recording.**
 
 We recommend creating a [Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) through [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this sample.
 
 ### Sample Cost Table
 
-The following table shows a sample monthly cost breakdown for the default parameters in the US East (N. Virginia) Region. It assumes 3,000 shopping sessions of about 5 minutes each, with spoken replies off (the default). It does not account for AWS Free Tier benefits.
+The following table shows a sample monthly cost breakdown for the default parameters in the US East (N. Virginia) Region. It assumes 3,000 shopping sessions per month, with spoken replies off (the default). The per-session usage of Nova 2.5 Sonic and AgentCore Runtime was measured in Amazon CloudWatch over 71 test sessions (October 2026, about 6 minutes of connection time each). The table does not account for AWS Free Tier benefits.
 
 | AWS service | Dimensions | Cost [USD] |
 | ----------- | ---------- | ---------- |
 | [Amazon SageMaker AI](https://aws.amazon.com/sagemaker/ai/pricing/) | Real-time endpoint, 1 × ml.g5.xlarge ($1.408/hour), 730 hours | $1,027.84 |
 | [Amazon OpenSearch Serverless](https://aws.amazon.com/opensearch-service/pricing/) | Vector collection, standby replicas disabled: minimum 1 OCU (0.5 indexing + 0.5 search) at $0.24/OCU-hour, under 1 GB storage | $175.20 |
 | [AWS PrivateLink](https://aws.amazon.com/privatelink/pricing/) | 2 interface endpoints (OpenSearch Serverless, Bedrock runtime) in one Availability Zone, $0.01/hour each | $14.60 |
-| [Amazon Bedrock (Nova 2.5 Sonic)](https://aws.amazon.com/nova/pricing/) | Per session about 1,000 speech input, 500 speech output, 8,000 text input and 500 text output tokens | $39.00 |
-| [Amazon Bedrock AgentCore Runtime](https://aws.amazon.com/bedrock/agentcore/pricing/) | 3,000 sessions, about 5 minutes each, about 30% active CPU, 1 vCPU, 512 MB memory | $7.88 |
+| [Amazon Bedrock (Nova 2.5 Sonic)](https://aws.amazon.com/nova/pricing/) | Measured per session: about 1,230 speech input, 400 speech output, 2,000 text input and 300 text output tokens | $30.00 |
+| [Amazon Bedrock AgentCore Runtime](https://aws.amazon.com/bedrock/agentcore/pricing/) | Measured per session: about 0.015 vCPU-hours ($0.0895/vCPU-hour) and 1.05 GB-hours of memory ($0.00945/GB-hour), including idle time until the session ends | $33.88 |
 | [Amazon Bedrock AgentCore Memory](https://aws.amazon.com/bedrock/agentcore/pricing/) | Short-term events and long-term preference records | $2.00 |
 | [Amazon Bedrock AgentCore Gateway](https://aws.amazon.com/bedrock/agentcore/pricing/) | About 60,000 tool invocations, 5 tools | $0.30 |
 | [Amazon Bedrock (Titan Text Embeddings V2)](https://aws.amazon.com/bedrock/pricing/) | About 60,000 query embeddings, about 20 tokens each | $0.02 |
 | [Amazon Cognito](https://aws.amazon.com/cognito/pricing/) | 1,000 monthly active users | $5.50 |
-| [AWS Lambda](https://aws.amazon.com/lambda/pricing/) | About 60,000 invocations, 512 MB, about 300 ms average duration | $0.50 |
+| [AWS Lambda](https://aws.amazon.com/lambda/pricing/) | About 60,000 invocations, 512 MB, about 400 ms average duration | $0.21 |
 | [Amazon DynamoDB](https://aws.amazon.com/dynamodb/pricing/) | 4 tables, on-demand, about 200,000 reads and 30,000 writes | $0.50 |
 | [Amazon S3](https://aws.amazon.com/s3/pricing/) | About 2,500 product images, about 150,000 presigned GETs, about 3 GB transfer | $0.35 |
 | [Amazon ECR](https://aws.amazon.com/ecr/pricing/) | Decider image (13.5 GB) and session host image | $1.40 |
 | [AWS Amplify](https://aws.amazon.com/amplify/pricing/) | Hosting: 5 GB storage, 15 GB bandwidth | $0.50 |
 | [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/pricing/) | Logs and metrics for all services | $5.00 |
-| | **Estimated Total** | **~$1,280.59** |
+| | **Estimated Total** | **~$1,297.30** |
 
 **Notes:**
 - The decider endpoint is about 80% of the total. On ml.g6.xlarge (`--decider-instance-type g6.xlarge`, $1.1267/hour), it costs about $822 per month instead of $1,028.
-- Usage-based costs are small: about $63 of the total for 3,000 sessions. Turning spoken replies on raises the Nova 2.5 Sonic output-token cost.
-- The Nova 2.5 Sonic token counts are estimates for a visual-first session with spoken replies off. Speech output is used only for yes/no confirmations.
+- Usage-based costs are small: about $78 of the total for 3,000 sessions, mostly Nova 2.5 Sonic and AgentCore Runtime memory time. Turning spoken replies on raises the Nova 2.5 Sonic output-token cost.
+- The measured sessions were test sessions with spoken replies off, so speech output covers only yes/no confirmations. Longer sessions, or spoken replies on, raise the Nova 2.5 Sonic and AgentCore Runtime costs.
 - Each deploy also runs AWS CodeBuild jobs for the image builds and the catalog load (a few dollars per fresh deploy).
 - If you keep the decider image between deployments (`./cleanup-all.sh --keep-decider-image`), Amazon ECR storage costs about $1.35 per month. Nothing else runs or bills.
 
@@ -568,6 +568,8 @@ For any feedback, questions, or suggestions, use the [Issues tab](https://github
 ## Authors
 
 - Ravi Kumar, Senior TAM
+- Salman Ahmed, Senior TAM
+- Sergio Barraza, Senior TAM
 
 ## License
 
