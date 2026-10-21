@@ -812,8 +812,13 @@ class TurnPipeline:
         state = self.state
         on_screen = [p['asin'] for p in state.shelf]
         if [p['asin'] for p in self._results[:len(on_screen)]] != on_screen:
-            # The shelf is not from the latest search (for example after "go back"): search it again.
-            return await self._narrowing(turn, plan, retrieval, timings, decider_down)
+            # The shelf is not from the latest search (for example after "go back" or a
+            # no-match turn): search it again. The turn's own search was cancelled for a
+            # show_more intent, so this is a new one, for the sentence before "show me more".
+            text = next((t for t in reversed(state.transcripts[:-1]) if t), state.transcripts[-1])
+            args = self._search_args(text)
+            self._retrieval_filters = self._filters_of(args)
+            return await self._narrowing(turn, plan, asyncio.create_task(self._timed_search(args)), timings, decider_down)
         total = len(self._results)
         if len(on_screen) >= total:
             return {'directive': 'act', 'say': f'That is all {total} match{"es" if total != 1 else ""}.'}

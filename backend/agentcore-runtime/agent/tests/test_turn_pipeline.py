@@ -973,3 +973,19 @@ def test_unsure_amount_removes_only_one():
         return tools, await p.on_final('remove the bag')
     tools, done = run(go())
     assert [a for kind, a in tools.calls if kind == 'remove'][-1]['keepQuantity'] == 1 and tools.cart['itemCount'] == 1
+
+
+def test_show_more_after_a_no_match_searches_again():
+    """'Show me more' after a no-match turn was cancelled with no reply: its fallback
+    search waited on the turn's own search, already cancelled (2026-10-21)."""
+    async def go():
+        p, tools, _, _ = make(MOM, tools=FakeTools(search_delay=0.05))   # the search is still running
+        await p.on_final('a gift for my mom')
+        p._results = []   # the shelf no longer matches the latest search, as after a no-match turn
+        p.deps.ask_decider.script = {'intent': ans('intent', 'show_more', 0.9)}
+        searches = len([1 for kind, _ in tools.calls if kind == 'search'])
+        done = await p.on_final('show me more')
+        return tools, searches, done
+    tools, searches, done = run(go())
+    assert done['directive'] in ('act', 'no_match') and done['say']
+    assert len([1 for kind, _ in tools.calls if kind == 'search']) > searches
