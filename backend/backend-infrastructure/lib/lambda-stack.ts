@@ -188,7 +188,7 @@ export class LambdaStack extends cdk.Stack {
     this.removeFromCart = makeFunction('RemoveFromCart', 'remove_from_cart tool: deletes one cart line in VoiceShop-Cart.', {
       CART_TABLE_NAME: props.cartTable.tableName,
     });
-    this.removeFromCart.addToRolePolicy(new iam.PolicyStatement({ actions: ['dynamodb:DeleteItem', 'dynamodb:Query'], resources: [props.cartTable.tableArn] }));
+    this.removeFromCart.addToRolePolicy(new iam.PolicyStatement({ actions: ['dynamodb:DeleteItem', 'dynamodb:UpdateItem', 'dynamodb:Query'], resources: [props.cartTable.tableArn] }));
 
     // ---- place_order ------------------------------------------------------
     this.placeOrder = makeFunction('PlaceOrder', 'place_order tool: cart -> one idempotent order in VoiceShop-Orders, then empties the cart.', {

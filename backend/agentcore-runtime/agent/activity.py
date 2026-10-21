@@ -24,6 +24,7 @@ QUESTION_NAMES = {
     'pointed_item': 'Which card do you mean?',
     'scroll': 'Which way to scroll?',
     'cart_item': 'Which cart item?',
+    'remove_amount': 'Remove one or all of them?',
 }
 
 INTENT_NAMES = {

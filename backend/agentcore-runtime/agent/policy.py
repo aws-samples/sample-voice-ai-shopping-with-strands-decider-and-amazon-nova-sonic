@@ -106,7 +106,7 @@ class UnderstandPlan:
     confirmation: bool = False
     # The action an 'ask_offer' turn offers ('place_order', 'go_back', 'start_over',
     # 'add_to_cart:<asin>', 'open:<asin>', 'widen:<slot>', 'switch:<slot>:<value>',
-    # 'remove:<asin>', 'remove:all'); "yes" next turn carries it out.
+    # 'remove:<asin>', 'remove_one:<asin>', 'add_more:<asin>', 'remove:all'); "yes" next turn carries it out.
     offer: str | None = None
 
 

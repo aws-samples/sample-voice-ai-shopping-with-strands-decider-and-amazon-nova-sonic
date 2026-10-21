@@ -81,6 +81,10 @@ class TurnPipeline:
         self.state = state
         self.deps = deps
         self._turn_task: asyncio.Task | None = None
+        # The turn that has started a cart or order write. A newer sentence waits for it
+        # instead of cancelling it: on 2026-10-21 a "yes" that had already added the jeans
+        # was cancelled before it closed the product, and the next sentence added them again.
+        self._committing: asyncio.Task | None = None
         self._round_answers: dict = {}
         self._background: set[asyncio.Task] = set()   # fire-and-forget work, kept referenced
         self._retrieval_filters: dict = {}
@@ -113,15 +117,21 @@ class TurnPipeline:
         self._spec_timer = asyncio.create_task(self._speculate_after(text))
 
     def on_final(self, text: str) -> asyncio.Future:
-        """Final user transcript: cancel the running turn and start a new one."""
+        """Final user transcript: cancel the running turn and start a new one. A turn
+        that has started a cart or order write is not cancelled; the new turn starts
+        after it, on the state it leaves."""
         if self._spec_timer:
             self._spec_timer.cancel()
-        if self._turn_task and not self._turn_task.done():
-            self._turn_task.cancel()
+        previous, after = self._turn_task, None
+        if previous and not previous.done():
+            if self._committing is previous:
+                after = previous
+            else:
+                previous.cancel()
         loop = asyncio.get_running_loop()
         self._outcome = loop.create_future()
         outcome = self._outcome
-        self._turn_task = asyncio.create_task(self._run_turn(text, outcome))
+        self._turn_task = asyncio.create_task(self._run_turn(text, outcome, after))
         return outcome
 
     async def turn_outcome(self, hold_s: float = OUTCOME_HOLD_S) -> dict:
@@ -223,8 +233,14 @@ class TurnPipeline:
         return {k: hit.get(k) for k in CATALOG_FIELDS}
 
     # --------------------------------------------------------------------- turn
-    async def _run_turn(self, text: str, outcome: asyncio.Future) -> None:
+    def _commit_point(self) -> None:
+        """Called just before a cart or order write: from here the turn runs to its end."""
+        self._committing = asyncio.current_task()
+
+    async def _run_turn(self, text: str, outcome: asyncio.Future, after: asyncio.Task | None = None) -> None:
         try:
+            if after:
+                await asyncio.wait({after})
             result = await self._turn(text)
         except asyncio.CancelledError:
             if not outcome.done():
@@ -570,12 +586,15 @@ class TurnPipeline:
             # The hard-filter invariant also covers ui.product_open.
             return {'directive': 'ask', 'say': "I can't open that one. Which other item would you like?"}
         state.open_product = self._slim(detail)
-        state.pending_offer = f"add_to_cart:{asin}"
+        line = next((i for i in state.cart.get('items', []) if i['asin'] == asin), None)
+        state.pending_offer = f"add_more:{asin}" if line else f"add_to_cart:{asin}"
+        question = f"It's already in your cart ({line.get('quantity', 1)}). Should I add another one?" if line \
+            else 'Should I add it to your cart?'
         why = policy.why_this_pick(state, detail, rank, len(state.shelf), pointed_probability)
         await deps.send(ui_events.product_open(turn, detail, why, pointed_probability))
         return {'directive': 'act', 'confirmation': True,
                 'say': f"Opened {questions.short_name(detail, rank + 1) if rank is not None else detail['title'][:80]}, "
-                       f"{ui_events.format_cents(detail['priceCents'])}. Should I add it to your cart?",
+                       f"{ui_events.format_cents(detail['priceCents'])}. {question}",
                 'product': {'title': detail['title'], 'brand': detail.get('brand'), 'price': ui_events.format_cents(detail['priceCents']),
                             'color': detail.get('color'), 'material': detail.get('material')}}
 
@@ -609,6 +628,12 @@ class TurnPipeline:
             return {**outcome, 'say': 'Emptied the cart.'} if outcome['directive'] == 'act' and not state.cart.get('itemCount') else outcome
         if offer and offer.startswith('remove:'):
             return await self._remove(turn, offer.split(':', 1)[1])
+        if offer and offer.startswith('remove_one:'):
+            asin = offer.split(':', 1)[1]
+            line = next((i for i in state.cart.get('items', []) if i['asin'] == asin), None)
+            if not line:
+                return {'directive': 'act', 'say': f'That is no longer in the cart. {cart_summary(state.cart)}'}
+            return await self._remove(turn, asin, keep=line['quantity'] - 1)
         if offer and offer.startswith('switch:'):
             _, qid, value = offer.split(':', 2)
             state.push_history()
@@ -638,14 +663,22 @@ class TurnPipeline:
             args = {**query, **state.hard_filters().search_arguments()}
             self._retrieval_filters = self._filters_of(args)
             return await self._narrowing(turn, plan, asyncio.create_task(self._timed_search(args)), timings, decider_down)
-        asin = offer.split(':', 1)[1] if offer and offer.startswith('add_to_cart:') else \
+        asin = offer.split(':', 1)[1] if offer and offer.startswith(('add_to_cart:', 'add_more:')) else \
             (state.open_product or {}).get('asin')
         if not asin:
             return {'directive': 'ask', 'say': 'Which one should I add?'}
+        line = next((i for i in state.cart.get('items', []) if i['asin'] == asin), None)
+        if line and offer != f'add_more:{asin}':
+            # Already in the cart: another one only on an explicit yes.
+            state.pending_offer = f'add_more:{asin}'
+            return {'directive': 'ask', 'confirmation': True,
+                    'say': f"{line.get('title', 'That item')[:80]} is already in your cart ({line.get('quantity', 1)}). "
+                           'Should I add another one?'}
         return await self._add(turn, asin)
 
     async def _add(self, turn: int, asin: str) -> dict:
         state, deps = self.state, self.deps
+        self._commit_point()
         try:
             started = time.perf_counter()
             result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'quantity': 1,
@@ -675,6 +708,7 @@ class TurnPipeline:
         if not state.cart.get('itemCount'):
             return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
         request = {'sessionId': state.session_id, 'idempotencyKey': f'{state.session_id}:{turn}'}
+        self._commit_point()
         result = None
         for attempt in range(2):   # the same key: a retry returns the order instead of placing a second one
             try:
@@ -720,14 +754,17 @@ class TurnPipeline:
         if not items:
             return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to remove.'}
         sure = plan.intent_band == 'act'
-        if len(items) == 1 and sure:
+        several = any(i.get('quantity', 1) > 1 for i in items)
+        if len(items) == 1 and sure and not several:
             return await self._remove(turn, items[0]['asin'])
+        qs = {**questions.cart_item_question(state.cart), **(questions.remove_amount_question() if several else {})}
         try:
-            result = await self._ask('cart_item', questions.cart_text(state, state.transcripts[-1]),
-                                     questions.cart_item_question(state.cart))
-            answer = result.answers.get('cart_item')
+            result = await self._ask('cart_item', questions.cart_text(state, state.transcripts[-1]), qs)
+            answer, amount = result.answers.get('cart_item'), result.answers.get('remove_amount')
         except (DeciderUnavailable, DeciderError):
-            answer = None
+            answer = amount = None
+        if len(items) == 1 and answer and answer.choice != 'none':
+            answer = policy.Answer('cart_item', items[0]['asin'], 1.0)   # the only line
         band = self.deps.thresholds.band(answer.confidence if answer else None, 'cart_item')
         if answer and answer.choice == 'all':
             # Emptying the cart removes several lines: always asked first.
@@ -735,19 +772,30 @@ class TurnPipeline:
             return {'directive': 'ask', 'confirmation': True, 'say': 'Should I empty the cart?'}
         if not answer or answer.choice in (None, 'none') or band == 'ask':
             return {'directive': 'ask', 'say': 'Which item should I remove? You can also tap the × next to it in the cart.'}
+        line = next((i for i in items if i['asin'] == answer.choice), {})
+        if line.get('quantity', 1) > 1 and not (amount and amount.choice == 'all'
+                                                and self.deps.thresholds.band(amount.confidence, 'remove_amount') == 'act'):
+            # Several of this line: one comes out unless the shopper clearly means all of them.
+            if band == 'act' and sure:
+                return await self._remove(turn, answer.choice, keep=line['quantity'] - 1)
+            state.pending_offer = f"remove_one:{answer.choice}"
+            return {'directive': 'ask', 'confirmation': True, 'say': f'Should I {questions.offer_text(state)}?'}
         if band == 'act' and sure:
             return await self._remove(turn, answer.choice)
         state.pending_offer = f'remove:{answer.choice}'   # unsure which line, or whether to remove: ask first
         return {'directive': 'ask', 'confirmation': True, 'say': f'Should I {questions.offer_text(state)}?'}
 
-    async def _remove(self, turn: int, asin: str) -> dict:
+    async def _remove(self, turn: int, asin: str, keep: int = 0) -> dict:
+        """Removes the line, or with keep lowers it to that many."""
         state, deps = self.state, self.deps
         title = next((i['title'] for i in state.cart.get('items', []) if i['asin'] == asin), asin)
+        self._commit_point()
         try:
             started = time.perf_counter()
-            result = await deps.tools.remove_from_cart({'sessionId': state.session_id, 'asin': asin})
-            await self._activity('dynamodb', 'Removed from the cart: DynamoDB VoiceShop-Cart', title[:80],
-                                 (time.perf_counter() - started) * 1000)
+            request = {'sessionId': state.session_id, 'asin': asin, **({'keepQuantity': keep} if keep else {})}
+            result = await deps.tools.remove_from_cart(request)
+            await self._activity('dynamodb', 'Removed from the cart: DynamoDB VoiceShop-Cart',
+                                 f'{title[:80]}' + (f' · {keep} left' if keep else ''), (time.perf_counter() - started) * 1000)
         except Exception:  # noqa: BLE001
             logger.error('❌ remove_from_cart failed', exc_info=True)
             return {'directive': 'error', 'say': "I couldn't remove that from the cart."}
@@ -755,6 +803,8 @@ class TurnPipeline:
             return {'directive': 'error', 'say': "I couldn't remove that from the cart."}
         state.cart = result['cart']
         await deps.send(ui_events.cart(state.cart))
+        if keep:
+            return {'directive': 'act', 'say': f'Removed one {title[:80]}; {keep} left. {cart_summary(state.cart)}'}
         return {'directive': 'act', 'say': f'Removed {title[:80]}. {cart_summary(state.cart)}'}
 
     async def _show_more(self, turn, plan, retrieval, timings, decider_down) -> dict:

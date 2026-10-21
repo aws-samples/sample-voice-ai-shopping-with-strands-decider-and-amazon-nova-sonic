@@ -66,10 +66,14 @@ export const TOOLS: Tool[] = [
     targetName: 'remove-from-cart',
     definition: {
       name: 'remove_from_cart',
-      description: 'Remove one product line from the session cart. Returns the updated cart with integer totals.',
+      description: 'Remove one product line from the session cart, or lower its quantity to keepQuantity. Returns the updated cart with integer totals.',
       inputSchema: {
         type: T.OBJECT,
-        properties: { sessionId: SESSION_ID, asin: ASIN },
+        properties: {
+          sessionId: SESSION_ID,
+          asin: ASIN,
+          keepQuantity: { type: T.INTEGER, description: 'How many of the product stay in the cart, 1-9; absent or 0 removes the line.' },
+        },
         required: ['sessionId', 'asin'],
       },
     },

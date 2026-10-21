@@ -26,8 +26,8 @@ CATALOG = [
 
 
 class FakeTools:
-    def __init__(self, fail_search=False, search_delay=0.0):
-        self.calls, self.fail_search, self.search_delay = [], fail_search, search_delay
+    def __init__(self, fail_search=False, search_delay=0.0, add_delay=0.0):
+        self.calls, self.fail_search, self.search_delay, self.add_delay = [], fail_search, search_delay, add_delay
         self.cart = {'items': [], 'itemCount': 0, 'totalCents': 0}
         self.keys = set()
 
@@ -45,20 +45,31 @@ class FakeTools:
         product = next(p for p in CATALOG if p['asin'] == args['asin'])
         return {'product': {**product, 'features': [], 'description': '', 'images': {}}}
 
+    def _set(self, items):
+        self.cart = {'items': items, 'itemCount': sum(i['quantity'] for i in items),
+                     'totalCents': sum(i['priceCents'] * i['quantity'] for i in items)}
+
     async def add_to_cart(self, args):
         self.calls.append(('add', args))
+        await asyncio.sleep(self.add_delay)
         if args['idempotencyKey'] not in self.keys:
             self.keys.add(args['idempotencyKey'])
-            price = next(p['priceCents'] for p in CATALOG if p['asin'] == args['asin'])
-            self.cart = {'items': self.cart['items'] + [{'asin': args['asin'], 'quantity': 1, 'priceCents': price}],
-                         'itemCount': self.cart['itemCount'] + 1, 'totalCents': self.cart['totalCents'] + price}
+            product = next(p for p in CATALOG if p['asin'] == args['asin'])
+            items = [dict(i) for i in self.cart['items']]
+            line = next((i for i in items if i['asin'] == args['asin']), None)
+            if line:
+                line['quantity'] += 1
+            else:
+                items.append({'asin': args['asin'], 'title': product['title'], 'quantity': 1, 'priceCents': product['priceCents']})
+            self._set(items)
         return {'cart': self.cart}
 
     async def remove_from_cart(self, args):
         self.calls.append(('remove', args))
-        items = [i for i in self.cart['items'] if i['asin'] != args['asin']]
-        self.cart = {'items': items, 'itemCount': sum(i['quantity'] for i in items),
-                     'totalCents': sum(i['priceCents'] * i['quantity'] for i in items)}
+        keep = args.get('keepQuantity', 0)
+        items = [dict(i, quantity=min(i['quantity'], keep)) if i['asin'] == args['asin'] else dict(i)
+                 for i in self.cart['items']]
+        self._set([i for i in items if i['quantity'] > 0])
         return {'cart': self.cart}
 
     async def place_order(self, args):
@@ -857,3 +868,108 @@ def test_a_price_keeps_the_department_and_searches_once():
     searches = run(go())
     assert len(searches) == 1
     assert searches[0]['departments'] == ['Bags & Accessories'] and searches[0]['maxPriceCents'] == 5000
+
+
+def test_a_cart_write_is_not_cancelled_by_the_next_sentence():
+    """A "yes" was cancelled after add_to_cart had run, before it closed the product, and
+    "let's add this to cart" added the jeans a second time (live session, 2026-10-21)."""
+    async def go():
+        p, tools, _, sent = make(MOM, tools=FakeTools(add_delay=0.2))
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95)}
+        first = p.on_final('yes')
+        await asyncio.sleep(0.05)   # the add is in flight
+        second = await p.on_final("let's add this to cart")
+        return p, tools, sent, first, second
+    p, tools, sent, first, second = run(go())
+    assert first.done() and first.result()['say'].startswith('Added to the cart')
+    assert len([1 for kind, _ in tools.calls if kind == 'add']) == 1 and tools.cart['itemCount'] == 1
+    assert p.state.open_product is None and of(sent, 'ui.product_close')
+    assert second['say'] == 'Which one should I add?'
+
+
+def test_adding_an_item_already_in_the_cart_asks_first():
+    async def go():
+        p, tools, _, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95)}
+        await p.on_final('add it')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        reopened = await p.on_final('the second one')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95), 'offer_reply': ans('offer_reply', 'yes', 0.95)}
+        added = await p.on_final('yes')
+        return tools, reopened, added
+    tools, reopened, added = run(go())
+    assert reopened['say'].endswith("It's already in your cart (1). Should I add another one?") and reopened['confirmation']
+    assert added['say'].startswith('Added to the cart') and tools.cart['items'][0]['quantity'] == 2
+
+
+def test_add_this_again_without_an_offer_asks_before_a_second_one():
+    async def go():
+        p, tools, _, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        p.state.pending_offer = None   # the offer was answered by an earlier sentence
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95)}
+        tools.cart = {'items': [{'asin': p.state.open_product['asin'], 'title': 'purple bag', 'quantity': 1,
+                                 'priceCents': 7999}], 'itemCount': 1, 'totalCents': 7999}
+        p.state.cart = dict(tools.cart)
+        asked = await p.on_final('add this to the cart')
+        return tools, asked
+    tools, asked = run(go())
+    assert asked['say'] == 'purple bag is already in your cart (1). Should I add another one?'
+    assert not [1 for kind, _ in tools.calls if kind == 'add']
+
+
+def _jeans_times_two(p, tools):
+    line = {'asin': CATALOG[1]['asin'], 'title': CATALOG[1]['title'], 'quantity': 2, 'priceCents': CATALOG[1]['priceCents']}
+    tools.cart = {'items': [line], 'itemCount': 2, 'totalCents': 2 * line['priceCents']}
+    p.state.cart = dict(tools.cart)
+
+
+def test_remove_one_of_two_lowers_the_quantity():
+    """"I just need one, can you remove one from the cart" removed both (live session, 2026-10-21)."""
+    async def go():
+        p, tools, decider, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        _jeans_times_two(p, tools)
+        p.deps.ask_decider.script = {'intent': ans('intent', 'remove_from_cart', 0.9),
+                                     'cart_item': ans('cart_item', CATALOG[1]['asin'], 0.95),
+                                     'remove_amount': ans('remove_amount', 'one', 0.9)}
+        done = await p.on_final('i just need one, can you remove one from the cart')
+        return tools, decider, done
+    tools, decider, done = run(go())
+    assert [a for kind, a in tools.calls if kind == 'remove'][-1]['keepQuantity'] == 1
+    assert tools.cart['itemCount'] == 1 and '1 left' in done['say']
+    assert 'remove_amount' in decider.calls[-1][1] and 'quantity 2' in decider.calls[-1][0]
+
+
+def test_remove_all_of_them_removes_the_line():
+    async def go():
+        p, tools, _, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        _jeans_times_two(p, tools)
+        p.deps.ask_decider.script = {'intent': ans('intent', 'remove_from_cart', 0.9),
+                                     'cart_item': ans('cart_item', CATALOG[1]['asin'], 0.95),
+                                     'remove_amount': ans('remove_amount', 'all', 0.9)}
+        return tools, await p.on_final('take both of them out')
+    tools, done = run(go())
+    assert 'keepQuantity' not in [a for kind, a in tools.calls if kind == 'remove'][-1] and tools.cart['itemCount'] == 0
+
+
+def test_unsure_amount_removes_only_one():
+    async def go():
+        p, tools, _, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        _jeans_times_two(p, tools)
+        p.deps.ask_decider.script = {'intent': ans('intent', 'remove_from_cart', 0.9),
+                                     'cart_item': ans('cart_item', CATALOG[1]['asin'], 0.95),
+                                     'remove_amount': ans('remove_amount', 'all', 0.45)}
+        return tools, await p.on_final('remove the bag')
+    tools, done = run(go())
+    assert [a for kind, a in tools.calls if kind == 'remove'][-1]['keepQuantity'] == 1 and tools.cart['itemCount'] == 1

@@ -124,6 +124,7 @@ INSTRUCTIONS = {
     'pointed_item': 'Which on-screen item is the shopper pointing at?',
     'scroll': 'Which way does the shopper want the page to move?',
     'cart_item': 'Which item in the cart does the shopper mean?',
+    'remove_amount': 'How many of that item does the shopper want taken out of the cart?',
 }
 
 
@@ -284,9 +285,16 @@ def cart_item_question(cart: dict) -> dict:
     return {'cart_item': {'type': 'choice', 'instructions': INSTRUCTIONS['cart_item'], 'criteria': criteria}}
 
 
+def remove_amount_question() -> dict:
+    """Asked with cart_item when a cart line holds more than one: "I just need one,
+    remove one" lowered nothing and emptied the line (live session, 2026-10-21)."""
+    criteria = {'one': 'Just one of them, keeping the rest', 'all': 'All of them, the whole line'}
+    return {'remove_amount': {'type': 'choice', 'instructions': INSTRUCTIONS['remove_amount'], 'criteria': criteria}}
+
+
 def cart_text(state: SessionState, transcript: str) -> str:
     return f'Latest shopper sentence: "{transcript}"\nIn the cart: ' + '; '.join(
-        i['title'] for i in state.cart.get('items', []))
+        f"{i['title']} (quantity {i.get('quantity', 1)})" for i in state.cart.get('items', []))
 
 
 def pointing_text(state: SessionState, transcript: str) -> str:
@@ -336,6 +344,10 @@ def offer_text(state: SessionState) -> str:
         return f'show {value.lower()} instead'
     if offer == 'remove:all':
         return 'empty the cart'
+    if offer.startswith(('remove_one:', 'add_more:')):
+        kind, asin = offer.split(':', 1)
+        title = next((i['title'] for i in state.cart.get('items', []) if i['asin'] == asin), 'that item')
+        return f'remove one {title} from the cart' if kind == 'remove_one' else f'add another {title} to the cart'
     if offer.startswith('remove:'):
         asin = offer.split(':', 1)[1]
         title = next((i['title'] for i in state.cart.get('items', []) if i['asin'] == asin), 'that item')
