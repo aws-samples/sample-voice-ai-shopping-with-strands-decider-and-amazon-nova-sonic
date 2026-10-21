@@ -29,8 +29,8 @@
 #   --dry-run              Print what would be deleted without deleting anything.
 #   --force                Skip the interactive confirmation prompt.
 #   --keep-decider-image   Keep VoiceShop-DeciderImageStack (the decider ECR repository
-#                          and its ~10 GB image, a few cents a month), so the next
-#                          deploy-all.sh skips the 15-25 minute image build.
+#                          and its 13.5 GB image, about $1.35 a month), so the next
+#                          deploy-all.sh skips the ~16 minute image build.
 #
 # Credentials: deleting the SageMaker endpoint stack can take 15+ minutes. Each
 # status check is a fresh CLI call, so a profile that refreshes its credentials
