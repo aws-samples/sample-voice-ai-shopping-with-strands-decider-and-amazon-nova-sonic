@@ -13,7 +13,7 @@ const endpoint = new DeciderEndpointStack(app, 'Endpoint', {
   repository: infra.repository,
   modelBucket: infra.modelBucket,
   imageTag: 'sm-test',
-  instanceType: 'g5.xlarge',
+  instanceType: 'g6.xlarge',
   minInstances: 1,
   maxInstances: 3,
   invocationsPerInstanceTarget: 120,
@@ -40,10 +40,10 @@ test('model runs with network isolation and no VPC, weights mounted from model/'
   });
 });
 
-test('endpoint uses ml.g5.xlarge with the minimum warm and long startup timeouts', () => {
+test('endpoint uses ml.g6.xlarge with the minimum warm and long startup timeouts', () => {
   t.hasResourceProperties('AWS::SageMaker::EndpointConfig', {
     ProductionVariants: [Match.objectLike({
-      InstanceType: 'ml.g5.xlarge', InitialInstanceCount: 1, ContainerStartupHealthCheckTimeoutInSeconds: 1800,
+      InstanceType: 'ml.g6.xlarge', InitialInstanceCount: 1, ContainerStartupHealthCheckTimeoutInSeconds: 1800,
     })],
   });
   t.hasResourceProperties('AWS::SageMaker::Endpoint', { EndpointName: 'voiceshop-decider' });

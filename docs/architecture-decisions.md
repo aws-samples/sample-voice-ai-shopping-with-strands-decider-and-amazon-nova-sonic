@@ -494,7 +494,7 @@ The AgentCore decider stacks, pool logic, measurement project and volume cleanup
 
 **Consequences.**
 
-- **Cost:** about 30% more per GPU-hour than AgentCore Instances. The warm minimum bills around the clock while deployed (~$822/month for one ml.g6.xlarge; about $1,028/month at $1.408/hour for the ml.g5.xlarge default since the 2026-10-19 amendment); `cleanup-all.sh` deletes it.
+- **Cost:** about 30% more per GPU-hour than AgentCore Instances. The warm minimum bills around the clock while deployed (~$822/month for one ml.g6.xlarge, the default again since the 2026-10-21 amendment; about $1,028/month at $1.408/hour for ml.g5.xlarge); `cleanup-all.sh` deletes it.
 - **Cold starts:** no shopper ever waits for one; scale-out adds capacity in minutes.
 - **Quota:** a new account's endpoint quota for the instance type may be 1, so `deciderMaxInstances` defaults to 1 until it is raised.
 - **Network:** the ECR/STS interface endpoints added for the capacity provider were not used by the endpoint and were removed. The whole VPC was removed later (ADR-26).
@@ -503,7 +503,9 @@ The AgentCore decider stacks, pool logic, measurement project and volume cleanup
 
 **Amendment (2026-10-19): default instance ml.g5.xlarge.** The first fresh deploy failed with InsufficientInstanceCapacity for ml.g6.xlarge in us-east-1. The default is now ml.g5.xlarge (NVIDIA A10G, 24 GB, $1.408/hour on-demand in us-east-1 against $1.1267 for ml.g6.xlarge), and `deploy-all.sh --decider-instance-type` picks another type; the quota check follows the chosen type. The latency numbers above were measured on ml.g6.xlarge.
 
-**Evidence.** AWS Price List API (EC2, AmazonSageMaker), 2026-10-18; AgentCore pricing page; docs/research.md "Instances lifecycle"; Service Quotas `L-D470D954` (ml.g6.xlarge) and `L-1928E07B` (ml.g5.xlarge, the default).
+**Amendment (2026-10-21): default instance ml.g6.xlarge again.** On the live endpoint, ml.g6.xlarge (NVIDIA L4) and ml.g5.xlarge (NVIDIA A10G) gave the same decider answers on a seven-turn replay, warm p50 185 ms against 191–202 ms, and turns of 0.40–1.54 s against 0.43–1.66 s, at $1.1267 against $1.408 per hour (about $822 against $1,028 per month). The default is ml.g6.xlarge; when it has no capacity, `--decider-instance-type g5.xlarge` is the fallback (README Known issues). Changing the type of an existing endpoint fails while auto-scaling is registered on it ("must be deregistered as scalable targets ... before they can ... have their instance type updated"), so a type change deletes and recreates `VoiceShop-DeciderEndpointStack`; a fresh deploy is not affected.
+
+**Evidence.** AWS Price List API (EC2, AmazonSageMaker), 2026-10-18; AgentCore pricing page; docs/research.md "Instances lifecycle"; Service Quotas `L-D470D954` (ml.g6.xlarge, the default) and `L-1928E07B` (ml.g5.xlarge).
 
 ---
 

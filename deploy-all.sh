@@ -17,7 +17,7 @@
 #   --skip-catalog    Skip loading the catalog (step 2).
 #   --decider-instance-type <t>
 #                     SageMaker instance type for the decider, without "ml."
-#                     (default g5.xlarge; g6.xlarge and g6e.xlarge also work).
+#                     (default g6.xlarge; g5.xlarge and g6e.xlarge also work).
 #   --decider-max-instances <n>
 #                     Upper bound for decider endpoint auto-scaling (default 1).
 #                     Must not exceed your account's SageMaker quota
@@ -42,7 +42,7 @@ SKIP_CATALOG=false
 USER_EMAIL=""
 USER_NAME=""
 DECIDER_MAX_INSTANCES=1
-DECIDER_INSTANCE_TYPE=g5.xlarge
+DECIDER_INSTANCE_TYPE=g6.xlarge
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-catalog) SKIP_CATALOG=true; shift ;;
@@ -203,5 +203,5 @@ echo ""
 echo "✅ Deploy complete. Open ${FRONTEND_URL} and sign in as AppUser (the temporary"
 echo "   password is in the Cognito invitation email sent to --user-email)."
 echo "   GPU cost reminder: the decider endpoint keeps at least one ml.${DECIDER_INSTANCE_TYPE} running"
-echo "   (ml.g5.xlarge: about \$1.41/hour on-demand in us-east-1) for as long as it is deployed. Run"
+echo "   (ml.g6.xlarge: about \$1.13/hour on-demand in us-east-1) for as long as it is deployed. Run"
 echo "   cleanup-all.sh when you are done testing or recording."

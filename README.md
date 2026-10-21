@@ -47,7 +47,7 @@ The architecture is split into six sections:
 - the **Amazon ECR** repository;
 - a CodeBuild job that copies the Strands Decider 2B weights from Hugging Face to Amazon S3 once;
 - a CodeBuild job that builds the inference container on an AWS Deep Learning Containers base image;
-- the **Amazon SageMaker AI** real-time endpoint `voiceshop-decider`: ml.g5.xlarge by default, auto-scaling, with network isolation.
+- the **Amazon SageMaker AI** real-time endpoint `voiceshop-decider`: ml.g6.xlarge (NVIDIA L4) by default, auto-scaling, with network isolation.
 
 **Section D: AgentCore Gateway.** A CDK stack creates the **Amazon Bedrock AgentCore Gateway** with MCP and IAM authentication. It exposes five Lambda functions as tools: `search_catalog`, `get_product_detail`, `add_to_cart`, `remove_from_cart` and `place_order`.
 
@@ -72,7 +72,7 @@ The session host (Python, FastAPI) runs the turn pipeline and the decision polic
 
 ### Cost
 
-You are responsible for the cost of the AWS services used while running this sample. As of October 2026, running it with the default settings in the US East (N. Virginia) Region costs approximately $1,297 per month for 3,000 shopping sessions. About 94% of that is fixed: the GPU instance behind the decider endpoint and the OpenSearch Serverless minimum both bill for every hour the sample is deployed, whether or not anyone is shopping. **Run `./cleanup-all.sh` when you finish testing or recording.**
+You are responsible for the cost of the AWS services used while running this sample. As of October 2026, running it with the default settings in the US East (N. Virginia) Region costs approximately $1,092 per month for 3,000 shopping sessions. About 93% of that is fixed: the GPU instance behind the decider endpoint and the OpenSearch Serverless minimum both bill for every hour the sample is deployed, whether or not anyone is shopping. **Run `./cleanup-all.sh` when you finish testing or recording.**
 
 We recommend creating a [Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) through [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this sample.
 
@@ -82,7 +82,7 @@ The following table shows a sample monthly cost breakdown for the default parame
 
 | AWS service | Dimensions | Cost [USD] |
 | ----------- | ---------- | ---------- |
-| [Amazon SageMaker AI](https://aws.amazon.com/sagemaker/ai/pricing/) | Real-time endpoint, 1 × ml.g5.xlarge ($1.408/hour), 730 hours | $1,027.84 |
+| [Amazon SageMaker AI](https://aws.amazon.com/sagemaker/ai/pricing/) | Real-time endpoint, 1 × ml.g6.xlarge ($1.1267/hour), 730 hours | $822.49 |
 | [Amazon OpenSearch Serverless](https://aws.amazon.com/opensearch-service/pricing/) | Vector collection, standby replicas disabled: minimum 1 OCU (0.5 indexing + 0.5 search) at $0.24/OCU-hour, under 1 GB storage | $175.20 |
 | [AWS PrivateLink](https://aws.amazon.com/privatelink/pricing/) | 2 interface endpoints (OpenSearch Serverless, Bedrock runtime) in one Availability Zone, $0.01/hour each | $14.60 |
 | [Amazon Bedrock (Nova 2.5 Sonic)](https://aws.amazon.com/nova/pricing/) | Measured per session: about 1,230 speech input, 400 speech output, 2,000 text input and 300 text output tokens | $30.00 |
@@ -97,10 +97,10 @@ The following table shows a sample monthly cost breakdown for the default parame
 | [Amazon ECR](https://aws.amazon.com/ecr/pricing/) | Decider image (13.5 GB) and session host image | $1.40 |
 | [AWS Amplify](https://aws.amazon.com/amplify/pricing/) | Hosting: 5 GB storage, 15 GB bandwidth | $0.50 |
 | [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/pricing/) | Logs and metrics for all services | $5.00 |
-| | **Estimated Total** | **~$1,297.30** |
+| | **Estimated Total** | **~$1,091.95** |
 
 **Notes:**
-- The decider endpoint is about 80% of the total. On ml.g6.xlarge (`--decider-instance-type g6.xlarge`, $1.1267/hour), it costs about $822 per month instead of $1,028.
+- The decider endpoint is about 75% of the total. ml.g6.xlarge is the smallest full-GPU G6 instance SageMaker AI offers for a real-time endpoint. The fallback ml.g5.xlarge (`--decider-instance-type g5.xlarge`, $1.408/hour) costs about $1,028 per month instead of $822, with the same answers and latency in our tests.
 - Usage-based costs are small: about $78 of the total for 3,000 sessions, mostly Nova 2.5 Sonic and AgentCore Runtime memory time. Turning spoken replies on raises the Nova 2.5 Sonic output-token cost.
 - The measured sessions were test sessions with spoken replies off, so speech output covers only yes/no confirmations. Longer sessions, or spoken replies on, raise the Nova 2.5 Sonic and AgentCore Runtime costs.
 - Each deploy also runs AWS CodeBuild jobs for the image builds and the catalog load (a few dollars per fresh deploy).
@@ -134,7 +134,7 @@ Install the following tools before deployment:
   - create AWS Lambda functions, Amazon DynamoDB tables, Amazon S3 buckets and Amazon ECR repositories;
   - create AWS CodeBuild projects, Amazon Cognito user pools and identity pools, and AWS Amplify apps.
 - Amazon Bedrock model access for **Amazon Nova 2.5 Sonic** and **Amazon Titan Text Embeddings V2**. Request access in the [Amazon Bedrock console](https://console.aws.amazon.com/bedrock/) if it is not already enabled. Anthropic Claude and Stability AI models are needed only to regenerate the catalog ([generator](backend/catalog-data/README.md#generator)).
-- Amazon SageMaker AI quota **"ml.g5.xlarge for endpoint usage"** of at least `--decider-max-instances` (default 1). Find it in [Service Quotas](https://console.aws.amazon.com/servicequotas/). For another `--decider-instance-type`, you need that type's quota instead. New accounts often start at 0. `deploy-all.sh` checks the quota before it deploys anything.
+- Amazon SageMaker AI quota **"ml.g6.xlarge for endpoint usage"** of at least `--decider-max-instances` (default 1). Find it in [Service Quotas](https://console.aws.amazon.com/servicequotas/). For another `--decider-instance-type`, you need that type's quota instead. New accounts often start at 0. `deploy-all.sh` checks the quota before it deploys anything.
 
 ### AWS CDK bootstrap
 
@@ -171,7 +171,7 @@ chmod +x deploy-all.sh cleanup-all.sh codebuild-scripts/build-image.sh
 
 **Optional parameters:**
 - `--user-name`: display name of the demo user (default `AppUser`). The sign-in username is always `AppUser`.
-- `--decider-instance-type`: the decider GPU instance, without `ml.` (default `g5.xlarge`; `g6.xlarge` and `g6e.xlarge` also work).
+- `--decider-instance-type`: the decider GPU instance, without `ml.` (default `g6.xlarge`; `g5.xlarge` and `g6e.xlarge` also work). To change the type of a deployed endpoint, see [Known issues](#known-issues).
 - `--decider-max-instances`: the upper bound for decider auto-scaling (default 1). It must not exceed your quota.
 - `--skip-catalog`: skip loading the catalog.
 
@@ -364,7 +364,7 @@ What you can do:
 - **More results and moving around.** "Show me more" adds the next 12 results, up to 49. "Scroll down" and "back to the top" move the page. "Close it" closes the open product.
 - **No match.** The closest items stay on screen, and the assistant offers to drop one filter. Say "yes" to widen the search.
 - **Yes/no questions.** They show Yes and No buttons. If the browser already allows the microphone for the site, it opens by itself so you can answer by voice.
-- **Cart.** Say "add it to my cart". Remove a line by voice ("remove the blouse from my cart") or with its ×. "Empty my cart" asks first.
+- **Cart.** Say "add it to my cart". If the item is already in the cart, the assistant asks "Should I add another one?" first. Remove an item by voice ("remove the blouse from my cart") or with its ×. When the cart holds more than one of an item, "remove one" takes out one and keeps the rest, and "remove both" takes out the line. "Empty my cart" asks first.
 - **Orders.** "Place my order" always asks "Should I place the order?" first. If the cart is empty, the assistant says so. An order is a DynamoDB record, and nothing is charged.
 - **Voice on / Voice off.** Spoken replies are off by default, and the chat shows the reply text instead. The header toggle turns spoken replies on. Yes/no confirmations are spoken either way.
 - **Behind the scenes.** Press **D**, or use **Debug overlay** in the footer, to see each sentence's decider questions and answers, catalog searches, DynamoDB writes and timings. **Pop out** moves the panel to its own window, for example to keep it beside the store while you record.
@@ -513,7 +513,8 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **The first request after a deploy is slow.** The first decider request can take several seconds while the GPU kernels compile, even after the pre-warm. Say one or two sentences before a demo.
 - **The mic does not open by itself for a yes/no question.** It opens automatically only after the browser has allowed the microphone for this site. Each new Amplify URL is a new site: click the mic once and allow it.
 - **No mic audio with a Bluetooth headset on macOS.** The browser may receive silence until the device is selected again. Re-select the headset as the input in the system sound settings or the browser, or use the built-in microphone.
-- **"InsufficientInstanceCapacity" when the endpoint is created.** AWS has no free GPUs of that type in the Region at the moment. Re-run with another type, for example `--decider-instance-type g6.xlarge`, or retry later.
+- **"InsufficientInstanceCapacity" when the endpoint is created.** AWS has no free GPUs of that type in the Region at the moment. Re-run with another type, for example `--decider-instance-type g5.xlarge`, or retry later.
+- **Changing `--decider-instance-type` on a deployed endpoint fails** with "must be deregistered as scalable targets with Application Auto Scaling before they can ... have their instance type updated". SageMaker does not change the instance type of an endpoint that has auto-scaling. Delete the endpoint stack first, then deploy with the new type: `cd backend/decider-runtime/cdk && npx cdk destroy VoiceShop-DeciderEndpointStack --force`, then `./deploy-all.sh --decider-instance-type <type>`. The decider is down for about 11 minutes.
 - **A step seems to hang for many minutes on a Mac.** The computer went to sleep. The scripts keep a Mac awake with `caffeinate`, but closing the lid on battery still sleeps it, so keep it open or on power.
 - **Credentials expire during a long run.** Use a profile that refreshes itself (IAM Identity Center or `credential_process`), and re-run the script. It continues where stacks are already deployed.
 - **The frontend says config values are missing.** The backend stacks are not deployed yet. Run `deploy-all.sh`.
@@ -521,7 +522,7 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 
 ### Additional considerations
 
-- **The GPU endpoint runs all the time.** The decider endpoint keeps at least one GPU instance running while it is deployed. For lower cost, use `--decider-instance-type g6.xlarge`, and clean up when you are not testing.
+- **The GPU endpoint runs all the time.** The decider endpoint keeps at least one GPU instance running while it is deployed. Clean up when you are not testing.
 - **Private search.** The search collection accepts requests only through its VPC endpoint, and each request must be SigV4-signed by a role named in a data access policy. Only the two functions that call it run in the VPC. The decider container has no network access at all ([ADR-32](docs/architecture-decisions.md#adr-32-private-search-collection)).
 - **Availability.** The search VPC uses one Availability Zone, and the decider scales to one instance by default. Use two or more zones and instances in production.
 - **Data retention.** The Sessions and Cart tables use DynamoDB TTL (`expiresAt`) to remove old items automatically.
