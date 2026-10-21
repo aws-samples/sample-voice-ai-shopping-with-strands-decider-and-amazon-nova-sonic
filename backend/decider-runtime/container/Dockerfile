@@ -17,6 +17,11 @@ ARG BASE_IMAGE=public.ecr.aws/deep-learning-containers/base:12.9.1-gpu-py312-cu1
 
 FROM ${BASE_IMAGE}
 ARG STRANDS_DECIDER_COMMIT=930e6d5de16309be32579f5631a7369a3322140c
+# The base image declares NVIDIA_REQUIRE_CUDA=cuda>=12.9, and the NVIDIA container runtime
+# refuses to start it on a host whose driver is older (SageMaker: CannotStartContainerError,
+# no container log, 2026-10-21). The 12.9 toolkit is needed only to build causal-conv1d;
+# at run time torch uses its bundled CUDA 12.6 libraries, as with the earlier 12.4 base.
+ENV NVIDIA_DISABLE_REQUIRE=1
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 RUN command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*)
 RUN python3 --version && nvcc --version && python3 -m pip install --no-cache-dir --upgrade pip
