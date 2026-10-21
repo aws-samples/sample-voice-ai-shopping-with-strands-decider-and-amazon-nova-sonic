@@ -23,6 +23,16 @@ ARG STRANDS_DECIDER_COMMIT=930e6d5de16309be32579f5631a7369a3322140c
 # at run time torch uses its bundled CUDA 12.6 libraries, as with the earlier 12.4 base.
 ENV NVIDIA_DISABLE_REQUIRE=1
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
+# The base also ships CUDA forward-compatibility driver libraries (cuda-compat, 12.9) ahead
+# of the host's own libcuda; on the SageMaker host that gave "Error 803: unsupported display
+# driver / cuda driver combination" and no GPU in torch (2026-10-21). Remove them so the
+# host driver's libcuda, mounted by the NVIDIA container runtime, is the one loaded.
+RUN rm -rf /usr/local/cuda/compat /usr/local/cuda-*/compat \
+    && for f in /etc/ld.so.conf.d/*; do grep -q compat "$f" && rm -f "$f" || true; done \
+    && find / -xdev \( -name 'libcuda.so*' -o -name 'libnvidia-ptxjitcompiler.so*' -o -name 'libnvidia-nvvm.so*' \) \
+         -not -path '*/stubs/*' -print -delete \
+    && ldconfig \
+    && (ldconfig -p | grep -i libcuda || echo "no libcuda in the image: the host driver provides it")
 RUN command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*)
 RUN python3 --version && nvcc --version && python3 -m pip install --no-cache-dir --upgrade pip
 RUN git clone https://github.com/strands-labs/strands-decider.git /opt/strands-decider \
