@@ -79,3 +79,10 @@ test('the model upload runs in CodeBuild and writes only the model bucket', () =
   const policies = JSON.stringify(infraTemplate.findResources('AWS::IAM::Policy'));
   expect(policies).not.toContain('"s3:*"');
 });
+
+
+test('endpoint runs on the GPU host image with driver 550 (CUDA 12.4)', () => {
+  t.hasResourceProperties('AWS::SageMaker::EndpointConfig', {
+    ProductionVariants: [Match.objectLike({ InferenceAmiVersion: 'al2-ami-sagemaker-inference-gpu-3-1' })],
+  });
+});

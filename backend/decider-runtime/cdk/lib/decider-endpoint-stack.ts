@@ -87,6 +87,10 @@ export class DeciderEndpointStack extends cdk.Stack {
         modelName: model.attrModelName,
         instanceType: `ml.${props.instanceType}`,
         initialInstanceCount: props.minInstances,
+        // The default GPU host image has NVIDIA driver 470 (CUDA 11.4): torch's CUDA 12.6
+        // libraries refused it ("driver too old", 2026-10-21). This one has driver 550 and
+        // CUDA 12.4, with the host's CUDA-compat mounting disabled.
+        inferenceAmiVersion: 'al2-ami-sagemaker-inference-gpu-3-1',
         // Model data (~4.8 GB) download + load before /ping answers.
         modelDataDownloadTimeoutInSeconds: 1800,
         containerStartupHealthCheckTimeoutInSeconds: 1800,
