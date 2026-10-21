@@ -72,6 +72,21 @@ The decider endpoint is the main running cost. It keeps at least one ml.g5.xlarg
 ./cleanup-all.sh --keep-decider-image   # delete everything except the decider image, for a faster redeploy
 ```
 
+### Redeploying faster: keep the decider image
+
+Each fresh deploy builds the decider container image from source in AWS CodeBuild: it pulls the AWS Deep Learning Containers base image from Amazon ECR Public, installs Strands Decider, PyTorch and a compiled CUDA extension, and pushes the result to your private Amazon ECR repository. That takes about 15 to 17 minutes. If you plan to deploy again, keep the image:
+
+```bash
+./cleanup-all.sh --keep-decider-image   # everything is deleted except VoiceShop-DeciderImageStack
+./deploy-all.sh                          # later: the image is found in ECR and the build step is skipped
+```
+
+- **What is kept:** only `VoiceShop-DeciderImageStack`, the ECR repository with the built image (about 13 GB). ECR storage for it costs about $1.30 per month; nothing else runs or bills.
+- **What is saved:** the image build. The decider steps run in parallel with the rest of the deploy, so the whole deploy gets shorter by up to the build time, depending on which of the two runs longer.
+- **When it is rebuilt anyway:** the image tag is a hash of `backend/decider-runtime/container/` (Dockerfile, requirements, `serve.py`). If you change any of them, the next deploy builds and uses a new image.
+- **Removing it later:** run `./cleanup-all.sh` without the flag.
+- **Why the image is not in the repository:** it is far larger than Git allows, SageMaker runs images only from a private ECR repository in your account and Region, and building from source keeps every layer visible and auditable.
+
 It deletes every VoiceShop stack in reverse deployment order, then the log groups and local outputs that no stack owns. The shared CDK bootstrap stack is left alone. A full cleanup took about 44 minutes (measured 2026-10-20). About 24 of them were `VoiceShop-LambdaStack`, while AWS released the network interfaces of the two VPC functions. Deleting the decider endpoint stack can also take 15 minutes or more, so use a refreshing credentials profile here too.
 
 ## Troubleshooting
