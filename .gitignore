@@ -48,3 +48,6 @@ deploy-decider.log
 
 # Derived eval scores (run_catalog_eval.py score writes them next to the results)
 backend/agentcore-runtime/eval/catalog/*-score.json
+
+# Claude Code conversation history (internal details; never commit)
+.conversation/
