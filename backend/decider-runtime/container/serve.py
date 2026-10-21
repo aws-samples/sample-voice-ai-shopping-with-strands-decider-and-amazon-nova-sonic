@@ -13,6 +13,7 @@ and only then routes traffic. The endpoint runs with network isolation, so the
 container makes no outbound calls at all.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -77,11 +78,19 @@ class SageMakerRoutes:
     def __init__(self, app, device: str) -> None:
         self.app = app
         self.device = device
+        # One inference at a time. Concurrent requests raced in Triton's kernel autotuner
+        # ("'NoneType' object is not a mapping" in chunk_gated_delta_rule) while new input
+        # shapes were being tuned (2026-10-21). The GPU serializes the work anyway: 4
+        # concurrent calls took ~530 ms against ~490 ms one after another.
+        self.lock = asyncio.Lock()
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] == "http" and scope["path"] == "/invocations":
             scope = dict(scope, path=DECIDER_ROUTE, raw_path=DECIDER_ROUTE.encode())
             send = self._with_gpu_field(send)
+            async with self.lock:
+                await self.app(scope, receive, send)
+            return
         await self.app(scope, receive, send)
 
     def _with_gpu_field(self, send):

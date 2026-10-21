@@ -106,7 +106,10 @@ def parse_response(questions: dict, body: dict) -> tuple[dict[str, Answer], list
 
 
 async def ask(state_text: str, questions: dict, endpoint_name: str | None = None, client=None) -> DeciderResult:
-    """One decider round. Raises DeciderUnavailable or DeciderError; never retries."""
+    """One decider round. Raises DeciderUnavailable or DeciderError. A container error
+    (ModelError or 5xx) is retried once: the questions are read-only, and a fresh decider
+    endpoint failed some concurrent calls while its kernels were still being tuned
+    (2026-10-21). Timeouts are not retried, so a slow decider never doubles the wait."""
     request = build_request(state_text, questions)
     endpoint = endpoint_name or os.environ['DECIDER_ENDPOINT_NAME']
     runtime = client or _sagemaker_runtime()
@@ -115,9 +118,20 @@ async def ask(state_text: str, questions: dict, endpoint_name: str | None = None
         return runtime.invoke_endpoint(EndpointName=endpoint, ContentType='application/json',
                                        Accept='application/json', Body=json.dumps(request).encode())
 
+    def call_with_one_retry():
+        try:
+            return call()
+        except ClientError as exc:
+            code = exc.response.get('Error', {}).get('Code', '')
+            status = exc.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0)
+            if code != 'ModelError' and status < 500:
+                raise
+            logger.warning('⚠️ decider %s (%s); retrying once', code, status)
+            return call()
+
     started = time.perf_counter()
     try:
-        response = await asyncio.to_thread(call)
+        response = await asyncio.to_thread(call_with_one_retry)
         body = json.loads(response['Body'].read())
     except (ReadTimeoutError, ConnectTimeoutError) as exc:
         raise DeciderUnavailable(f'timeout: {exc}') from exc

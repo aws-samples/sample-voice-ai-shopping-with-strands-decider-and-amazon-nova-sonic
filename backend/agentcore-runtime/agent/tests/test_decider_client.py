@@ -79,3 +79,21 @@ def test_live_endpoint_understand_round():
     # "mother" carries the gender (questions.RECIPIENT_OPTIONS); the gender question itself may say not mentioned.
     assert result.answers['recipient'].choice == 'mother'
     assert result.answers['gender'].choice in ('women', 'not_mentioned')
+
+
+def test_a_container_error_is_retried_once():
+    from botocore.exceptions import ClientError
+    calls = []
+
+    class FlakyRuntime:
+        def invoke_endpoint(self, **kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise ClientError({'Error': {'Code': 'ModelError', 'Message': 'triton'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 424}}, 'InvokeEndpoint')
+            body = {'answers': {'q': {'type': 'noul', 'noul': 0.9}}}
+            import io
+            return {'Body': io.BytesIO(json.dumps(body).encode())}
+
+    result = run(decider_client.ask('s', {'q': {'type': 'noul', 'instructions': 'x'}}, endpoint_name='e', client=FlakyRuntime()))
+    assert len(calls) == 2 and result.answers['q'].noul == 0.9
