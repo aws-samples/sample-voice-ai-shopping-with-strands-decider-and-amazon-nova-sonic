@@ -42,7 +42,7 @@ The script runs two chains side by side. The decider chain (its ECR repository a
 | `--decider-instance-type <type>` | Decider GPU instance, without `ml.` (default `g5.xlarge`; `g6.xlarge`, `g6e.xlarge` also work) |
 | `--decider-max-instances <n>` | Upper bound for decider auto-scaling (default 1); must not exceed your quota |
 
-A fresh run took about 50 minutes (measured 2026-10-20); most of it is the decider image build and the endpoint creation. With `cleanup-all.sh --keep-decider-image` the image survives a cleanup, and the next deploy skips the image build, so it is faster. Use a credentials profile that refreshes itself, for example AWS IAM Identity Center or `credential_process`: `AWS_PROFILE=<profile> ./deploy-all.sh ...`.
+A fresh run took about 31 minutes (measured 2026-10-21): the decider chain (model upload, image build about 16 minutes, endpoint about 9 minutes) runs in parallel with the rest, which takes about 27 minutes. With `cleanup-all.sh --keep-decider-image` the image survives a cleanup, and the next deploy skips the image build, so it is faster. Use a credentials profile that refreshes itself, for example AWS IAM Identity Center or `credential_process`: `AWS_PROFILE=<profile> ./deploy-all.sh ...`.
 
 When it finishes, the script prints the Amplify URL. Sign in as `AppUser`. The first sign-in uses the temporary password from the Cognito invitation email sent to `--user-email`.
 
@@ -74,20 +74,20 @@ The decider endpoint is the main running cost. It keeps at least one ml.g5.xlarg
 
 ### Redeploying faster: keep the decider image
 
-Each fresh deploy builds the decider container image from source in AWS CodeBuild: it pulls the AWS Deep Learning Containers base image from Amazon ECR Public, installs Strands Decider, PyTorch and a compiled CUDA extension, and pushes the result to your private Amazon ECR repository. That takes about 15 to 17 minutes. If you plan to deploy again, keep the image:
+Each fresh deploy builds the decider container image from source in AWS CodeBuild: it pulls the AWS Deep Learning Containers base image from Amazon ECR Public, installs Strands Decider, PyTorch and a compiled CUDA extension, and pushes the result to your private Amazon ECR repository. That takes about 16 minutes. If you plan to deploy again, keep the image:
 
 ```bash
 ./cleanup-all.sh --keep-decider-image   # everything is deleted except VoiceShop-DeciderImageStack
 ./deploy-all.sh                          # later: the image is found in ECR and the build step is skipped
 ```
 
-- **What is kept:** only `VoiceShop-DeciderImageStack`, the ECR repository with the built image (about 13 GB). ECR storage for it costs about $1.30 per month; nothing else runs or bills.
-- **What is saved:** the image build. The decider steps run in parallel with the rest of the deploy, so the whole deploy gets shorter by up to the build time, depending on which of the two runs longer.
+- **What is kept:** only `VoiceShop-DeciderImageStack`, the ECR repository with the built image (13.5 GB compressed). ECR storage for it costs about $1.35 per month; nothing else runs or bills.
+- **What is saved:** the image build. The decider steps run in parallel with the rest of the deploy, so the whole deploy gets only a few minutes shorter (from about 31 to about 28 minutes in the 2026-10-21 run, when the other steps become the longer path), and the image is not rebuilt or re-pulled from ECR Public.
 - **When it is rebuilt anyway:** the image tag is a hash of `backend/decider-runtime/container/` (Dockerfile, requirements, `serve.py`). If you change any of them, the next deploy builds and uses a new image.
 - **Removing it later:** run `./cleanup-all.sh` without the flag.
 - **Why the image is not in the repository:** it is far larger than Git allows, SageMaker runs images only from a private ECR repository in your account and Region, and building from source keeps every layer visible and auditable.
 
-It deletes every VoiceShop stack in reverse deployment order, then the log groups and local outputs that no stack owns. The shared CDK bootstrap stack is left alone. A full cleanup took about 44 minutes (measured 2026-10-20). About 24 of them were `VoiceShop-LambdaStack`, while AWS released the network interfaces of the two VPC functions. Deleting the decider endpoint stack can also take 15 minutes or more, so use a refreshing credentials profile here too.
+It deletes every VoiceShop stack in reverse deployment order, then the log groups and local outputs that no stack owns. The shared CDK bootstrap stack is left alone. A full cleanup took about 44 minutes (measured 2026-10-20 and 2026-10-21). About 24 of them were `VoiceShop-LambdaStack`, while AWS released the network interfaces of the two VPC functions. Deleting the decider endpoint stack can also take 15 minutes or more, so use a refreshing credentials profile here too.
 
 ## Troubleshooting
 

@@ -24,7 +24,7 @@
 #                     "ml.<type> for endpoint usage" (Service Quotas); request an
 #                     increase there first if needed.
 #
-# Credentials: a fresh run takes about 50 minutes (measured 2026-10-20; faster when the
+# Credentials: a fresh run takes about 31 minutes (measured 2026-10-21; a little faster when the
 # decider image was kept by cleanup-all.sh --keep-decider-image), and some steps wait 15+ minutes. With
 # short-lived credentials, use a profile that refreshes itself (AWS IAM Identity
 # Center, or credential_process), e.g. AWS_PROFILE=<profile> ./deploy-all.sh ...
