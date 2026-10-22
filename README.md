@@ -134,6 +134,7 @@ Install the following tools before deployment:
   - create AWS Lambda functions, Amazon DynamoDB tables, Amazon S3 buckets and Amazon ECR repositories;
   - create AWS CodeBuild projects, Amazon Cognito user pools and identity pools, and AWS Amplify apps.
 - Amazon Bedrock model access for **Amazon Nova 2.5 Sonic** and **Amazon Titan Text Embeddings V2**. Request access in the [Amazon Bedrock console](https://console.aws.amazon.com/bedrock/) if it is not already enabled. Anthropic Claude and Stability AI models are needed only to regenerate the catalog ([generator](backend/catalog-data/README.md#generator)).
+- Room for **one more VPC** in the Region: VoiceShop creates its own VPC, and the default quota "VPCs per Region" is 5. Check it in Service Quotas (Amazon VPC) and request an increase if the account already has 5.
 - Amazon SageMaker AI quota **"ml.g6.xlarge for endpoint usage"** of at least `--decider-max-instances` (default 1). Find it in [Service Quotas](https://console.aws.amazon.com/servicequotas/). For another `--decider-instance-type`, you need that type's quota instead. New accounts often start at 0. `deploy-all.sh` checks the quota before it deploys anything.
 
 ### AWS CDK bootstrap
@@ -183,7 +184,7 @@ chmod +x deploy-all.sh cleanup-all.sh codebuild-scripts/build-image.sh
 - Waits for both chains, then pre-warms the decider endpoint and prints its latency.
 - Prints the Amplify URL.
 
-A fresh deploy took about 31 minutes (measured October 2026). Re-running the script is safe: stacks update in place, and images that are already built are skipped.
+A fresh deploy took about 31 minutes (measured October 2026). Creating the SageMaker AI endpoint can take 30 minutes or more when GPU capacity is tight; in one test account it waited 23 minutes for an instance, and the whole deploy took 53 minutes. Re-running the script is safe: stacks update in place, and images that are already built are skipped.
 
 **Environment:**
 - Designed for macOS and Linux, including Amazon Linux 2023 on Amazon EC2.
