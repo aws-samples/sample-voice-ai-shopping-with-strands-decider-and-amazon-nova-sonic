@@ -989,3 +989,30 @@ def test_show_more_after_a_no_match_searches_again():
     tools, searches, done = run(go())
     assert done['directive'] in ('act', 'no_match') and done['say']
     assert len([1 for kind, _ in tools.calls if kind == 'search']) > searches
+
+
+def test_pointing_opens_the_card_even_if_a_slot_question_picks_up_something_else():
+    """'Number three' also committed Tops (read from the shelf in the context), and the hard
+    filter then refused No. 3, a dress (live session, 2026-10-23). A confident pointing sentence
+    chooses a card on screen and adds no chips."""
+    async def go():
+        p, tools, _, sent = make({'intent': ans('intent', 'narrowing', 0.9)})
+        await p.on_final('show me some bags')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95), 'gender': ans('gender', 'men', 0.9)}
+        done = await p.on_final('number two')
+        return p, sent, done
+    p, sent, done = run(go())
+    opened = of(sent, 'ui.product_open')
+    assert opened and opened[-1]['product']['asin'] == p.state.shelf[1]['asin'] and done['say'].startswith('Opened')
+    assert p.state.gender is None   # the stray answer did not become a chip
+
+
+def test_a_change_of_mind_still_applies_in_a_pointing_sentence():
+    async def go():
+        p, tools, _, sent = make(MOM)
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95), 'recipient': ans('recipient', 'father', 0.9)}
+        await p.on_final("number two, actually it's for my dad")
+        return p
+    p = run(go())
+    assert p.state.recipient and p.state.recipient.value == 'father'
