@@ -46,10 +46,11 @@ COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 COPY serve.py /opt/program/serve.py
 # The server runs as an unprivileged user. It reads the model from the read-only mount at
-# /opt/ml/model and writes only under /tmp (Hugging Face cache links) and its home (kernel caches).
-RUN useradd --create-home --uid 10001 decider
+# /opt/ml/model and writes only under its home: the Hugging Face cache links, kernel caches and
+# temporary files (on SageMaker hosts /tmp is not writable by an unprivileged user, 2026-10-23).
+RUN useradd --create-home --uid 10001 decider && mkdir -p /home/decider/tmp && chown decider /home/decider/tmp
 USER decider
-ENV HOME=/home/decider
+ENV HOME=/home/decider TMPDIR=/home/decider/tmp
 WORKDIR /opt/program
 EXPOSE 8080
 # SageMaker starts the container as `docker run <image> serve`; the argument is ignored.

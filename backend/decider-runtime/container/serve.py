@@ -25,7 +25,8 @@ READONLY_HF_CACHE = os.path.join(MODEL_DIR, "hf-cache")
 # huggingface_hub writes lock files at the cache root even when offline, and
 # /opt/ml/model is read-only: give it a writable root whose model directories
 # are symlinks into the read-only mount.
-HF_CACHE = "/tmp/hf-cache"
+# Writable by the unprivileged server user (Dockerfile USER); on SageMaker hosts /tmp is not.
+HF_CACHE = os.environ.get("DECIDER_CACHE_DIR", os.path.join(os.path.expanduser("~"), "hf-cache"))
 DECIDER_ROUTE = "/v1/systemone"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
