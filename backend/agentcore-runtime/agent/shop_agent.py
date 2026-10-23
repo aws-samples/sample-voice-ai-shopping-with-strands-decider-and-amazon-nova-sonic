@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 
 import boto3
@@ -41,6 +42,10 @@ ASIN = re.compile(r'^[A-Z0-9]{10}$')
 SESSION_ID = re.compile(r'^[A-Za-z0-9-]{36,100}$')   # the cart tools' pattern
 SLOTS = {'recipient', 'gender', 'department', 'category', 'budget'}
 SESSION_HEADER = 'x-amzn-bedrock-agentcore-runtime-session-id'
+# Per-connection limits (messages per second, burst). Normal speech sends about 16 audio frames
+# a second (64 ms each); typed text and UI events are human-paced. Beyond these, messages are
+# dropped and counted as invalid, so a scripted client cannot flood the decider and the tools.
+RATE_LIMITS = {'bidi_audio_input': (40.0, 80), 'bidi_text_input': (1.0, 5), 'ui': (5.0, 20)}
 
 app = FastAPI()
 
@@ -83,6 +88,38 @@ async def catalog_meta() -> Catalog:
     catalog.department_descriptions = dict(item.get('departmentDescriptions') or {})
     catalog.category_descriptions = dict(item.get('categoryDescriptions') or {})
     return catalog
+
+
+class TokenBucket:
+    """Allows `rate` events a second with bursts up to `burst`."""
+
+    def __init__(self, rate: float, burst: int, clock=time.monotonic):
+        self.rate, self.burst, self.clock = rate, float(burst), clock
+        self.tokens, self.stamp = float(burst), clock()
+
+    def take(self) -> bool:
+        now = self.clock()
+        self.tokens = min(self.burst, self.tokens + (now - self.stamp) * self.rate)
+        self.stamp = now
+        if self.tokens >= 1:
+            self.tokens -= 1
+            return True
+        return False
+
+
+def limiter_for(buckets: dict, kind: str) -> TokenBucket:
+    key = kind if kind in RATE_LIMITS else 'ui'
+    if key not in buckets:
+        buckets[key] = TokenBucket(*RATE_LIMITS[key])
+    return buckets[key]
+
+
+def owned_state(stored: SessionState | None, actor_id: str) -> SessionState | None:
+    """A stored session only for its owner: the browser chooses the session id, and the cart
+    and orders are keyed by it, so another shopper's id must not open their session."""
+    if stored is not None and stored.actor_id != actor_id:
+        return None
+    return stored
 
 
 def valid(message: dict, state: SessionState) -> bool:
@@ -139,8 +176,14 @@ async def websocket_endpoint(websocket: WebSocket):
     session_id = websocket.headers.get(SESSION_HEADER) or websocket.query_params.get('session_id') or ''
     if not SESSION_ID.match(session_id):   # the cart tools require 36-100 characters
         session_id = str(uuid.uuid4())
+    stored = await state_store.load(session_id)
+    state = owned_state(stored, user['sub'])
+    if stored is not None and state is None:
+        # Someone else's session id: a new id, so their cart and orders stay out of reach.
+        logger.warning('⚠️ session %s belongs to another shopper; starting a new session', session_id[:8])
+        session_id = str(uuid.uuid4())
     logger.info('🚀 session %s for actor %s', session_id[:8], user['sub'][:8])
-    state = await state_store.load(session_id) or SessionState(session_id=session_id, actor_id=user['sub'])
+    state = state or SessionState(session_id=session_id, actor_id=user['sub'])
     restored = bool(state.turn_seq)
     memory = SessionMemory(actor_id=user['sub'], session_id=session_id)
     remembered, meta = await asyncio.gather(memory.remembered(), catalog_meta())
@@ -163,7 +206,7 @@ async def websocket_endpoint(websocket: WebSocket):
             else:
                 await pipeline.initial_shelf()
 
-            bridge = SonicBridge(pipeline, send, tools, voice=websocket.query_params.get('voice_id', 'tiffany'),
+            bridge = SonicBridge(pipeline, send, tools,
                                  remembered=remembered)
             try:
                 await bridge.start()
@@ -174,12 +217,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 await send(ui_events.status('error', 'Voice is unavailable right now. You can still type.'))
 
             invalid = 0
+            buckets: dict = {}
             while True:
                 try:
                     message = json.loads(await websocket.receive_text())
                 except ValueError:
                     message = None
-                if not valid(message, state):
+                if not valid(message, state) or not limiter_for(buckets, message['type']).take():
                     invalid += 1
                     logger.warning('⚠️ invalid browser message (%s of %s)', invalid, MAX_INVALID_MESSAGES)
                     if invalid >= MAX_INVALID_MESSAGES:

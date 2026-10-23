@@ -23,6 +23,8 @@ const runtime = new AgentCoreRuntimeStack(app, 'TestRuntime', {
   memoryId: infra.memory.attrMemoryId,
   gatewayUrl: 'https://voiceshop-gateway-abcdefghij.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp',
   deciderEndpointName: 'voiceshop-decider',
+  userPoolId: 'us-east-1_TestPool',
+  userPoolClientId: 'testclientid',
   sonicModelId: 'amazon.nova-2-5-sonic',
   actThreshold: 0.8,
   askThreshold: 0.5,

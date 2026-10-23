@@ -9,6 +9,8 @@ a Sonic stream. Token contents are never logged.
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import logging
 import os
 
@@ -34,6 +36,29 @@ class AuthError(Exception):
     pass
 
 
+def _claims(token: str) -> dict:
+    """The token's payload, unverified: called only after Cognito has accepted the token."""
+    try:
+        payload = token.split('.')[1]
+        return json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+    except (IndexError, ValueError) as exc:
+        raise AuthError('malformed access token') from exc
+
+
+def check_audience(claims: dict) -> None:
+    """GetUser accepts an access token from any user pool in the Region; only this sample's
+    user pool and app client may open a session (USER_POOL_ID and USER_POOL_CLIENT_ID, set by
+    the runtime stack). Without them configured (local tests), nothing is checked."""
+    pool, client = os.environ.get('USER_POOL_ID'), os.environ.get('USER_POOL_CLIENT_ID')
+    region = os.environ.get('AWS_REGION', 'us-east-1')
+    if pool and claims.get('iss') != f'https://cognito-idp.{region}.amazonaws.com/{pool}':
+        raise AuthError('token from another user pool')
+    if client and claims.get('client_id') != client:
+        raise AuthError('token for another app client')
+    if claims.get('token_use', 'access') != 'access':
+        raise AuthError('not an access token')
+
+
 async def verify(message: dict) -> dict:
     """Returns {'sub', 'username', 'name', 'email'} for a valid auth message, else raises AuthError."""
     if not isinstance(message, dict) or message.get('type') != 'auth':
@@ -47,6 +72,11 @@ async def verify(message: dict) -> dict:
         code = exc.response.get('Error', {}).get('Code', 'Unknown')
         logger.warning('⚠️ token rejected by Cognito: %s', code)
         raise AuthError(code) from exc
+    try:
+        check_audience(_claims(token))
+    except AuthError as exc:
+        logger.warning('⚠️ token rejected: %s', exc)
+        raise
     attributes = {a['Name']: a['Value'] for a in response.get('UserAttributes', [])}
     return {'sub': attributes.get('sub', response.get('Username')), 'username': response.get('Username'),
             'name': attributes.get('name'), 'email': attributes.get('email')}

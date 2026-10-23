@@ -50,6 +50,8 @@ const runtime = new AgentCoreRuntimeStack(app, 'VoiceShop-AgentCoreRuntimeStack'
   memoryId: infra.memory.attrMemoryId,
   gatewayUrl: Fn.importValue('VoiceShop-AgentCoreGatewayStack-GatewayUrl'),
   deciderEndpointName: DECIDER_ENDPOINT_NAME,
+  userPoolId: Fn.importValue('VoiceShop-CognitoStack-UserPoolId'),
+  userPoolClientId: Fn.importValue('VoiceShop-CognitoStack-UserPoolClientId'),
   sonicModelId,
   actThreshold,
   askThreshold,

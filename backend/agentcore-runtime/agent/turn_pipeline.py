@@ -12,8 +12,10 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import os
 import re
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
 
@@ -32,6 +34,25 @@ logger = logging.getLogger(__name__)
 SHELF_SIZE = 12
 CANDIDATES = 49
 RETRIEVAL_LIMIT = 200
+# Shopper transcripts are personal data: kept out of the turn log unless switched on for debugging.
+LOG_TRANSCRIPTS = os.environ.get('LOG_TRANSCRIPTS', '').lower() == 'true'
+
+
+def _cart_serialized(method):
+    """One cart or order write at a time per session: a tapped remove and a turn's add could
+    otherwise interleave, and the later response would overwrite the cart shown on screen."""
+    async def wrapper(self, *args, **kwargs):
+        async with self._cart_lock:
+            return await method(self, *args, **kwargs)
+    wrapper.__name__, wrapper.__doc__ = method.__name__, method.__doc__
+    return wrapper
+
+
+def request_key(session_id: str) -> str:
+    """An idempotency key for one confirmed cart or order action. Random, not the turn number: the
+    turn counter restarts from the last saved state after a reconnect, and a reused key would make
+    a new add or order a silent no-op reported as done."""
+    return f'{session_id}:{uuid.uuid4().hex}'
 SPECULATIVE_DEBOUNCE_S = 0.25
 # How long get_turn_outcome waits for the turn before Sonic says "One moment.". The
 # screen never waits on this. It covers the slowest turn (a no-match: search, best_fit
@@ -81,6 +102,7 @@ class TurnPipeline:
         self.state = state
         self.deps = deps
         self._turn_task: asyncio.Task | None = None
+        self._cart_lock = asyncio.Lock()
         # The turn that has started a cart or order write. A newer sentence waits for it
         # instead of cancelling it: on 2026-10-21 a "yes" that had already added the jeans
         # was cancelled before it closed the product, and the next sentence added them again.
@@ -419,7 +441,7 @@ class TurnPipeline:
             await deps.send(ui_events.status('listening', 'Listening'))
         logger.info('📋 turn %s', {'turn': turn, 'intent': plan.intent, 'band': plan.intent_band,
                                    'directive': outcome['directive'], 'say': outcome.get('say', '')[:120], 'timings': timings,
-                                   'transcript': text[:200],
+                                   **({'transcript': text[:200]} if LOG_TRANSCRIPTS else {}),
                                    'answers': {q['id']: [(t['option'], t['p']) for t in q['top']]
                                                for q in ui_events.debug_questions({**answers, **{f'{k} (re-check)': v for k, v in recheck.items()}, **self._round_answers})}})
         if deps.on_turn_end:
@@ -676,13 +698,14 @@ class TurnPipeline:
                            'Should I add another one?'}
         return await self._add(turn, asin)
 
+    @_cart_serialized
     async def _add(self, turn: int, asin: str) -> dict:
         state, deps = self.state, self.deps
         self._commit_point()
         try:
             started = time.perf_counter()
             result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'quantity': 1,
-                                                   'idempotencyKey': f'{state.session_id}:{turn}'})
+                                                   'idempotencyKey': request_key(state.session_id)})
             cart = result.get('cart') or {}
             await self._activity('dynamodb', 'Added to the cart: one DynamoDB transaction on VoiceShop-Cart',
                                  f"1 × {next((p['title'] for p in state.shelf if p['asin'] == asin), asin)[:60]} · cart now "
@@ -703,11 +726,12 @@ class TurnPipeline:
     async def _place_order(self, turn, plan, retrieval, timings, decider_down) -> dict:
         return await self._do_place_order(turn)
 
+    @_cart_serialized
     async def _do_place_order(self, turn: int) -> dict:
         state, deps = self.state, self.deps
         if not state.cart.get('itemCount'):
             return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
-        request = {'sessionId': state.session_id, 'idempotencyKey': f'{state.session_id}:{turn}'}
+        request = {'sessionId': state.session_id, 'idempotencyKey': request_key(state.session_id)}
         self._commit_point()
         result = None
         for attempt in range(2):   # the same key: a retry returns the order instead of placing a second one
@@ -785,6 +809,7 @@ class TurnPipeline:
         state.pending_offer = f'remove:{answer.choice}'   # unsure which line, or whether to remove: ask first
         return {'directive': 'ask', 'confirmation': True, 'say': f'Should I {questions.offer_text(state)}?'}
 
+    @_cart_serialized
     async def _remove(self, turn: int, asin: str, keep: int = 0) -> dict:
         """Removes the line, or with keep lowers it to that many."""
         state, deps = self.state, self.deps

@@ -11,6 +11,9 @@ export interface AgentCoreRuntimeStackProps extends cdk.StackProps {
   readonly memoryId: string;
   readonly gatewayUrl: string;
   readonly deciderEndpointName: string;
+  /** Cognito user pool and app client whose access tokens may open a session. */
+  readonly userPoolId: string;
+  readonly userPoolClientId: string;
   readonly sonicModelId: string;
   readonly actThreshold: number;
   readonly askThreshold: number;
@@ -45,6 +48,9 @@ export class AgentCoreRuntimeStack extends cdk.Stack {
         SESSIONS_TABLE_NAME: 'VoiceShop-Sessions',
         PRODUCTS_TABLE_NAME: 'VoiceShop-Products',
         LOG_LEVEL: 'INFO',
+        // Access tokens are accepted only from this user pool and app client (jwt_auth.check_audience).
+        USER_POOL_ID: props.userPoolId,
+        USER_POOL_CLIENT_ID: props.userPoolClientId,
       },
     });
 

@@ -292,12 +292,12 @@ def test_confirm_adds_with_idempotency_key_then_place_order_gating():
         return p, tools, sent, added, unsure, placed, again
     p, tools, sent, added, unsure, placed, again = run(go())
     add_calls = [a for kind, a in tools.calls if kind == 'add']
-    assert add_calls and add_calls[0]['idempotencyKey'] == f'{p.state.session_id}:3'
+    assert add_calls and add_calls[0]['idempotencyKey'].startswith(f'{p.state.session_id}:')
     assert 'Added to the cart' in added['say']
     # An order is always offered first and placed on yes; never for an empty cart.
     assert unsure['say'] == 'Should I place the order?' and unsure['speak'] is True   # spoken confirmation
     order_calls = [a for kind, a in tools.calls if kind == 'order']
-    assert len(order_calls) == 1 and order_calls[0]['idempotencyKey'] == f'{p.state.session_id}:5'
+    assert len(order_calls) == 1 and order_calls[0]['idempotencyKey'].startswith(f'{p.state.session_id}:')
     assert of(sent, 'ui.order_placed')[0]['itemCount'] == 1
     assert of(sent, 'ui.cart')[-1]['itemCount'] == 0
     assert 'empty' in again['say']

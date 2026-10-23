@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import logging
 import os
 import time
@@ -194,7 +195,11 @@ class SonicBridge:
 
     async def audio(self, pcm_base64: str) -> None:
         self._last_mic_frame = time.monotonic()
-        frame = base64.b64decode(pcm_base64)
+        try:
+            frame = base64.b64decode(pcm_base64, validate=True)
+        except binascii.Error:
+            logger.warning('⚠️ audio frame is not valid base64; dropped')
+            return
         if self.agent and not self._pending:
             await self.agent.send({'audio_delta': {'format': 'pcm', 'source': {'bytes': frame}}})
             return
