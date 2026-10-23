@@ -530,6 +530,13 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **Compliance.** Make sure voice data handling complies with local regulations (GDPR, CCPA and others) before you deploy to production.
 - **Accessibility.** Test the frontend with screen readers and keyboard navigation for accessibility compliance.
 - **IAM.** This sample creates one least-privilege IAM role per component. Review the IAM policies in each CDK stack against your organization's security requirements.
+- **Demo security choices.** Some settings suit a demo, not production:
+  - Multi-factor authentication is off for the demo user.
+  - The user pool client allows the password flow (`USER_PASSWORD_AUTH`) for the text test client; the web app signs in with SRP.
+  - The Debug overlay data (decider probabilities, timings, service names) is sent to every shopper.
+  - Recent turns, with their transcripts, are kept in the Sessions table for 24 hours. Transcripts stay out of the logs unless `LOG_TRANSCRIPTS=true` is set on the session host.
+
+  For production, turn on MFA, remove the password flow, put the Debug overlay behind a flag, and review data retention.
 
 ### Limitations
 
