@@ -39,7 +39,11 @@ export class DeciderEndpointStack extends cdk.Stack {
 
     // ---- Execution role (what SageMaker uses to pull the image, read the model and log)
     const executionRole = new iam.Role(this, 'DeciderExecutionRole', {
-      assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com'),
+      // Only SageMaker acting for this account may assume it (confused-deputy prevention), in
+      // the form the SageMaker AI documentation gives for inference: the trailing * is literal.
+      assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com', {
+        conditions: { ArnLike: { 'aws:SourceArn': `arn:${cdk.Aws.PARTITION}:sagemaker:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:*` } },
+      }),
       description: 'SageMaker execution role for the VoiceShop decider endpoint.',
     });
     props.repository.grantPull(executionRole);

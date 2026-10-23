@@ -184,7 +184,8 @@ echo "=== 7/7: VoiceShop-FrontendStack (Amplify app) and the frontend build ==="
   && ( cd cdk && npm ci --silent && npx cdk deploy VoiceShop-FrontendStack --require-approval never \
          --outputs-file cdk-outputs/frontend.json ) \
   && npm run deploy:amplify )
-FRONTEND_URL="$(python3 -c "import json; print(json.load(open('${REPO_ROOT}/frontend/cdk/cdk-outputs/frontend.json'))['VoiceShop-FrontendStack']['AmplifyAppUrl'])")"
+FRONTEND_URL="$(python3 -c "import json, sys; print(json.load(open(sys.argv[1]))['VoiceShop-FrontendStack']['AmplifyAppUrl'])" \
+  "${REPO_ROOT}/frontend/cdk/cdk-outputs/frontend.json")"
 
 echo "=== Waiting for the decider chain (see deploy-decider.log) ==="
 if ! wait "${DECIDER_PID}"; then

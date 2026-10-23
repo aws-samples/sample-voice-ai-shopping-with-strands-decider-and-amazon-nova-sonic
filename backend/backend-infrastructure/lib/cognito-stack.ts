@@ -68,7 +68,10 @@ export class CognitoStack extends cdk.Stack {
 
     this.userPoolClient = this.userPool.addClient('WebClient', {
       userPoolClientName: 'VoiceShop-WebClient',
+      // userPassword stays on for the text test client (test-client/text_client.py); the web app uses SRP.
       authFlows: { userPassword: true, userSrp: true },
+      // A stolen refresh token stays useful for 12 hours, not the 30-day default.
+      refreshTokenValidity: cdk.Duration.hours(12),
       generateSecret: false, // public browser client
       preventUserExistenceErrors: true,
     });

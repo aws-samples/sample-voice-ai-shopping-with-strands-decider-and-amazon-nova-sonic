@@ -35,6 +35,8 @@ export class AgentCoreInfraStack extends cdk.Stack {
     this.repository = new ecr.Repository(this, 'SessionHostRepository', {
       repositoryName: 'voiceshop-session-host',
       imageScanOnPush: true,
+      // Tags are content hashes and the builds skip a tag that exists: none is ever rewritten.
+      imageTagMutability: ecr.TagMutability.IMMUTABLE,
       emptyOnDelete: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -48,7 +50,7 @@ export class AgentCoreInfraStack extends cdk.Stack {
       description: 'ARM64 image build for the VoiceShop session host.',
       source: codebuild.Source.s3({ bucket: source.bucket, path: source.s3ObjectKey }),
       environment: {
-        buildImage: codebuild.LinuxArmBuildImage.AMAZON_LINUX_2_STANDARD_3_0,
+        buildImage: codebuild.LinuxArmBuildImage.AMAZON_LINUX_2023_STANDARD_3_0,
         computeType: codebuild.ComputeType.SMALL,
         privileged: true,
       },

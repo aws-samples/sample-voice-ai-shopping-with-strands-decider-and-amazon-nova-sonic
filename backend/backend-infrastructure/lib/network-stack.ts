@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { NagSuppressions } from 'cdk-nag';
 
@@ -38,10 +39,18 @@ export class NetworkStack extends cdk.Stack {
 
     // Free gateway endpoint: the index writer reads the documents file the
     // catalog loader leaves in the images bucket.
-    this.vpc.addGatewayEndpoint('S3Endpoint', {
+    const s3Endpoint = this.vpc.addGatewayEndpoint('S3Endpoint', {
       service: ec2.GatewayVpcEndpointAwsService.S3,
       subnets: [{ subnetType: ec2.SubnetType.PRIVATE_ISOLATED }],
     });
+    // Only this sample's images bucket through the endpoint, so code in the VPC cannot reach
+    // other buckets (for example to copy data out) through it.
+    s3Endpoint.addToPolicy(new iam.PolicyStatement({
+      principals: [new iam.AnyPrincipal()],
+      actions: ['s3:GetObject', 's3:ListBucket'],
+      resources: [`arn:${cdk.Aws.PARTITION}:s3:::voiceshop-images-${cdk.Aws.ACCOUNT_ID}-${cdk.Aws.REGION}`,
+                  `arn:${cdk.Aws.PARTITION}:s3:::voiceshop-images-${cdk.Aws.ACCOUNT_ID}-${cdk.Aws.REGION}/*`],
+    }));
 
     // search-catalog embeds the shopper's query with Titan Text Embeddings V2.
     const bedrockEndpoint = this.vpc.addInterfaceEndpoint('BedrockRuntimeEndpoint', {
@@ -49,6 +58,12 @@ export class NetworkStack extends cdk.Stack {
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       privateDnsEnabled: true,
     });
+    // Only the embedding model through the endpoint.
+    bedrockEndpoint.addToPolicy(new iam.PolicyStatement({
+      principals: [new iam.AnyPrincipal()],
+      actions: ['bedrock:InvokeModel'],
+      resources: [`arn:${cdk.Aws.PARTITION}:bedrock:${cdk.Aws.REGION}::foundation-model/amazon.titan-embed-text-v2:0`],
+    }));
     NagSuppressions.addResourceSuppressions(bedrockEndpoint, [{
       id: 'CdkNagValidationFailure',
       reason: 'AwsSolutions-EC23 cannot evaluate the VPC CIDR token; the endpoint security group allows HTTPS from this VPC\'s CIDR only.',

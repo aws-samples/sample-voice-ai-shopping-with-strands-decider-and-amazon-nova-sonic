@@ -15,6 +15,22 @@ export class FrontendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const region = this.region;
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      `img-src 'self' data: blob: https://voiceshop-images-${this.account}-${region}.s3.${region}.amazonaws.com`,
+      `connect-src 'self' https://cognito-idp.${region}.amazonaws.com https://cognito-identity.${region}.amazonaws.com wss://bedrock-agentcore.${region}.amazonaws.com`,
+      "font-src 'self' data:",
+      "media-src 'self' blob:",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join('; ');
+
     const app = new amplify.CfnApp(this, 'FrontendApp', {
       name: 'voiceshop-frontend',
       description: 'VoiceShop shopping UI (React + Vite), manual deployments.',
@@ -41,6 +57,10 @@ export class FrontendStack extends cdk.Stack {
         "        value: 'strict-origin-when-cross-origin'",
         "      - key: 'Permissions-Policy'",
         "        value: 'microphone=(self), camera=(), geolocation=()'",
+        // Only what the app uses: its own bundle, Cognito, the AgentCore WebSocket and the
+        // presigned product images. Inline styles stay allowed for the Amplify UI sign-in.
+        "      - key: 'Content-Security-Policy'",
+        `        value: "${csp}"`,
       ].join('\n'),
     });
 

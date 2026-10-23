@@ -16,6 +16,8 @@ export class DeciderImageStack extends cdk.Stack {
     this.repository = new ecr.Repository(this, 'DeciderRepository', {
       repositoryName: 'voiceshop-decider',
       imageScanOnPush: true,
+      // Tags are content hashes and the builds skip a tag that exists: none is ever rewritten.
+      imageTagMutability: ecr.TagMutability.IMMUTABLE,
       emptyOnDelete: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
