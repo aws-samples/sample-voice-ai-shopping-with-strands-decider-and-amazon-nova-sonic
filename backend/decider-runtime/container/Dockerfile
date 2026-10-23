@@ -13,7 +13,8 @@
 # CUDA toolkit. The model weights are NOT in the image: SageMaker mounts them
 # read-only at /opt/ml/model from S3 before the container starts (ModelDataSource).
 
-ARG BASE_IMAGE=public.ecr.aws/deep-learning-containers/base:12.9.1-gpu-py312-cu129-ubuntu22.04-ec2-v1.88
+# Pinned by digest as well as tag, so a rebuild cannot pick up a different base image.
+ARG BASE_IMAGE=public.ecr.aws/deep-learning-containers/base:12.9.1-gpu-py312-cu129-ubuntu22.04-ec2-v1.88@sha256:ae49e8e7ca0f30e25a8e7dfa4c484b26decfc1cd7b6b1c342c204fd5c1b20fca
 
 FROM ${BASE_IMAGE}
 ARG STRANDS_DECIDER_COMMIT=930e6d5de16309be32579f5631a7369a3322140c
@@ -34,16 +35,21 @@ RUN rm -rf /usr/local/cuda/compat /usr/local/cuda-*/compat \
     && ldconfig \
     && (ldconfig -p | grep -i libcuda || echo "no libcuda in the image: the host driver provides it")
 RUN command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*)
-RUN python3 --version && nvcc --version && python3 -m pip install --no-cache-dir --upgrade pip
+RUN python3 --version && nvcc --version && python3 -m pip install --no-cache-dir pip==26.2.2
 RUN git clone https://github.com/strands-labs/strands-decider.git /opt/strands-decider \
     && cd /opt/strands-decider \
     && git checkout "${STRANDS_DECIDER_COMMIT}" \
     && python3 -m pip install --no-cache-dir ".[cuda]"
 RUN python3 -m pip install --no-cache-dir --force-reinstall torch==2.7.1 --index-url https://download.pytorch.org/whl/cu126
-RUN python3 -m pip install --no-cache-dir causal-conv1d --no-build-isolation
+RUN python3 -m pip install --no-cache-dir causal-conv1d==1.7.0 --no-build-isolation
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 COPY serve.py /opt/program/serve.py
+# The server runs as an unprivileged user. It reads the model from the read-only mount at
+# /opt/ml/model and writes only under /tmp (Hugging Face cache links) and its home (kernel caches).
+RUN useradd --create-home --uid 10001 decider
+USER decider
+ENV HOME=/home/decider
 WORKDIR /opt/program
 EXPOSE 8080
 # SageMaker starts the container as `docker run <image> serve`; the argument is ignored.

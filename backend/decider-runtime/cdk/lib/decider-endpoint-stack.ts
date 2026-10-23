@@ -137,7 +137,7 @@ export class DeciderEndpointStack extends cdk.Stack {
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
-          install: { 'runtime-versions': { python: '3.12' }, commands: ['pip install --quiet boto3'] },
+          install: { 'runtime-versions': { python: '3.12' }, commands: ['pip install --quiet boto3==1.43.50'] },
           build: {
             commands: ['python3 -u measure-latency.py --endpoint-name "${ENDPOINT_NAME}" --region "${AWS_REGION}" --warm-calls "${WARM_CALLS}"'],
           },

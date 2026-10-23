@@ -1,10 +1,11 @@
 # VoiceShop session host for AgentCore Runtime (ARM64, built by CodeBuild).
-FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.12-slim
+# Pinned by digest as well as tag, so a rebuild cannot pick up a different base image.
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install pip==26.2.2 && pip install -r requirements.txt
 COPY *.py calibration.json ./
 
 RUN useradd --create-home --uid 1000 appuser

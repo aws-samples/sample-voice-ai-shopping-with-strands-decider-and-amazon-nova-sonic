@@ -195,7 +195,7 @@ if ! wait "${DECIDER_PID}"; then
 fi
 grep -E '^=== D' "${DECIDER_LOG}" || true
 PREWARM_VENV="$(mktemp -d)"
-python3 -m venv "${PREWARM_VENV}" && "${PREWARM_VENV}/bin/pip" install --quiet boto3
+python3 -m venv "${PREWARM_VENV}" && "${PREWARM_VENV}/bin/pip" install --quiet boto3==1.43.50
 "${PREWARM_VENV}/bin/python3" "${REPO_ROOT}/backend/decider-runtime/scripts/prewarm.py" --region "${REGION}"
 rm -rf "${PREWARM_VENV}"
 
