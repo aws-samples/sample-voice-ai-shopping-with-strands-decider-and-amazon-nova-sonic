@@ -486,7 +486,7 @@ Scaling would mean building a pool manager: routing, scheduled scaling, keep-ali
 
 - **Capacity:** ml.g6.xlarge, at least one instance always warm (`deciderMinInstances`, default 1), auto-scaling on `SageMakerVariantInvocationsPerInstance` with a target of 120 per minute, up to `deciderMaxInstances`.
 - **Network:** in the existing private subnets, with network isolation. (Amended 2026-10-19: no VPC; network isolation without a `VpcConfig`, see ADR-26.)
-- **Model files:** the checkpoint and the base-model Hugging Face cache live in a model bucket under `model/`, mounted read-only at `/opt/ml/model`.
+- **Model files:** the checkpoint and the base-model Hugging Face cache live in a model bucket under `model/`, mounted read-only at `/opt/ml/model`. Amendment (2026-10-23): both are downloaded at pinned commits, and the checkpoint comes from the `amazon` organization on Hugging Face, Strands Decider's mirror of `StrandsAgents` with identical files (all 29 file hashes compared). An unpinned download served whatever the repository held at deploy time (AppSec review, CWE-494).
 - **Image:** the CUDA/PyTorch environment is baked in. SageMaker has no 2 GB image cap, so ADR-14's S3-pulled venv is gone.
 - **Health check:** `/ping` returns 200 only once the model is loaded. That's SageMaker's contract, the opposite of the AgentCore workaround.
 

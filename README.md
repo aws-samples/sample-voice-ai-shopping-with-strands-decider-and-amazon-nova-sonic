@@ -45,7 +45,7 @@ The architecture is split into six sections:
 
 **Section C: Decision model.** Four CDK stacks set up the decision model:
 - the **Amazon ECR** repository;
-- a CodeBuild job that copies the Strands Decider 2B weights from Hugging Face to Amazon S3 once;
+- a CodeBuild job that copies the Strands Decider 2B weights once into Amazon S3, from the `amazon` organization on Hugging Face at a pinned commit (the Qwen3.5-2B base model from `Qwen`, also pinned); the endpoint never reaches Hugging Face;
 - a CodeBuild job that builds the inference container on an AWS Deep Learning Containers base image;
 - the **Amazon SageMaker AI** real-time endpoint `voiceshop-decider`: ml.g6.xlarge (NVIDIA L4) by default, auto-scaling, with network isolation.
 
