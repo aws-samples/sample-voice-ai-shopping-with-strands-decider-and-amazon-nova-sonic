@@ -48,8 +48,11 @@ def _claims(token: str) -> dict:
 def check_audience(claims: dict) -> None:
     """GetUser accepts an access token from any user pool in the Region; only this sample's
     user pool and app client may open a session (USER_POOL_ID and USER_POOL_CLIENT_ID, set by
-    the runtime stack). Without them configured (local tests), nothing is checked."""
+    the runtime stack). Without them, only unit tests run (no Gateway configured); a deployed
+    session host without them rejects every token rather than skip the check."""
     pool, client = os.environ.get('USER_POOL_ID'), os.environ.get('USER_POOL_CLIENT_ID')
+    if os.environ.get('AGENTCORE_GATEWAY_URL') and not (pool and client):
+        raise AuthError('USER_POOL_ID and USER_POOL_CLIENT_ID are not configured')
     region = os.environ.get('AWS_REGION', 'us-east-1')
     if pool and claims.get('iss') != f'https://cognito-idp.{region}.amazonaws.com/{pool}':
         raise AuthError('token from another user pool')

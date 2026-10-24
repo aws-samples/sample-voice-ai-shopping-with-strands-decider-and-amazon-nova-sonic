@@ -64,7 +64,7 @@ class SessionState:
 
     # ---------------------------------------------------------------- history
     # Go back restores the chips and the shelf, nothing else: never the cart, the turn
-    # counter (cart idempotency keys use it), the layout or a pending offer. The
+    # counter, the layout or a pending offer. The
     # product panel closes, as it does on screen.
     VIEW = ('recipient', 'gender', 'department', 'category', 'budget', 'budget_commit', 'context', 'shelf')
 

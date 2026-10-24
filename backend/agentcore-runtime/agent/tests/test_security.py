@@ -1,5 +1,6 @@
 """Security fixes from the 2026-10-23 AppSec review: session ownership, per-connection rate
-limits, token audience, idempotency keys, serialized cart writes, strict audio decoding."""
+limits, token audience, idempotency keys, serialized cart writes, strict audio decoding; and from
+the re-run: turn and decider limits that also cover speech, session claims, frame sizes."""
 
 import asyncio
 import base64
@@ -67,6 +68,14 @@ def test_tokens_from_another_pool_or_client_are_rejected(monkeypatch):
         jwt_auth._claims('not-a-jwt')
 
 
+def test_a_deployed_host_without_the_pool_settings_rejects_tokens(monkeypatch):
+    monkeypatch.setenv('AGENTCORE_GATEWAY_URL', 'https://gateway.example')
+    monkeypatch.delenv('USER_POOL_ID', raising=False)
+    monkeypatch.delenv('USER_POOL_CLIENT_ID', raising=False)
+    with pytest.raises(jwt_auth.AuthError):
+        jwt_auth.check_audience({'token_use': 'access'})
+
+
 def test_idempotency_keys_are_unique_and_fit_the_tools():
     session = 'session-' + 'x' * 92   # the longest session id the tools accept (100)
     keys = {turn_pipeline.request_key(session) for _ in range(100)}
@@ -119,3 +128,100 @@ def test_a_malformed_audio_frame_is_dropped(monkeypatch):
     asyncio.run(bridge.audio('not base64!!'))
     asyncio.run(bridge.audio(base64.b64encode(b'\x00\x01' * 8).decode()))
     assert len(sent) == 1
+
+
+@pytest.mark.turn_limit
+def test_a_flood_of_sentences_is_dropped_beyond_the_turn_limit():
+    """Typed and spoken sentences both arrive through on_final, so both count."""
+    async def go():
+        p, _, decider, _ = make(MOM)
+        outcomes = [p.on_final(f'a gift for my mom {i}') for i in range(8)]
+        dropped = [o for o in outcomes if o.done() and o.result().get('directive') == 'other']
+        await p._turn_task
+        return dropped
+    dropped = run(go())
+    assert len(dropped) == 8 - turn_pipeline.TURN_RATE[1]
+
+
+def test_decider_calls_of_a_cancelled_turn_keep_their_slots():
+    """A new sentence cancels the turn, but calls already sent hold their slots until they
+    return, and calls still waiting for a slot are never sent."""
+    async def go():
+        started, release = [], asyncio.Event()
+
+        async def slow_decider(state_text, qs):
+            started.append(state_text)
+            await release.wait()
+            raise turn_pipeline.DeciderUnavailable('test')
+
+        p, *_ = make(MOM)
+        p.deps.ask_decider = slow_decider
+        calls = [asyncio.create_task(p._decider_call(f's{i}', {})) for i in range(turn_pipeline.DECIDER_SLOTS + 3)]
+        await asyncio.sleep(0.01)
+        assert len(started) == turn_pipeline.DECIDER_SLOTS     # the rest wait for a slot
+        for c in calls:
+            c.cancel()
+        await asyncio.sleep(0.01)
+        assert p._decider_slots.locked()                      # the cancelled calls are still running
+        release.set()
+        await asyncio.sleep(0.01)
+        assert len(started) == turn_pipeline.DECIDER_SLOTS     # waiting calls were never sent
+        assert not p._decider_slots.locked()
+    run(go())
+
+
+def test_a_cart_tap_does_not_mark_a_turn_as_committing():
+    async def go():
+        p, tools, _, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        line = {'asin': CATALOG[0]['asin'], 'title': CATALOG[0]['title'], 'quantity': 1, 'priceCents': CATALOG[0]['priceCents']}
+        tools.cart = {'items': [line], 'itemCount': 1, 'totalCents': line['priceCents']}
+        p.state.cart = dict(tools.cart)
+        await p.remove_tapped(CATALOG[0]['asin'])
+        return p
+    p = run(go())
+    assert p._committing is None
+
+
+class FakeSessions:
+    """The VoiceShop-Sessions table with DynamoDB's conditional put."""
+
+    def __init__(self, fail_reads=False):
+        self.items, self.fail_reads = {}, fail_reads
+
+    def get_item(self, Key):
+        if self.fail_reads:
+            raise RuntimeError('DynamoDB unavailable')
+        item = self.items.get((Key['PK'], Key['SK']))
+        return {'Item': item} if item else {}
+
+    def put_item(self, Item, ConditionExpression=None, ExpressionAttributeValues=None):
+        from botocore.exceptions import ClientError
+        current = self.items.get((Item['PK'], Item['SK']))
+        if ConditionExpression and current and current.get('actorId') != ExpressionAttributeValues[':me']:
+            raise ClientError({'Error': {'Code': 'ConditionalCheckFailedException'}}, 'PutItem')
+        self.items[(Item['PK'], Item['SK'])] = Item
+
+
+def test_a_session_id_is_saved_only_by_its_owner(monkeypatch):
+    import state_store
+    table = FakeSessions()
+    monkeypatch.setattr(state_store, '_sessions', lambda: table)
+    sid = 's-' + 'x' * 40
+    assert asyncio.run(state_store.save(SessionState(session_id=sid, actor_id='owner')))
+    assert asyncio.run(state_store.save(SessionState(session_id=sid, actor_id='owner')))
+    assert not asyncio.run(state_store.save(SessionState(session_id=sid, actor_id='attacker')))
+    assert table.items[(f'SESSION#{sid}', 'STATE')]['actorId'] == 'owner'
+
+
+def test_a_failed_state_read_is_not_a_new_session(monkeypatch):
+    import state_store
+    monkeypatch.setattr(state_store, '_sessions', lambda: FakeSessions(fail_reads=True))
+    with pytest.raises(state_store.StateUnavailable):
+        asyncio.run(state_store.load('s-' + 'x' * 40))
+
+
+def test_an_oversized_audio_frame_is_invalid():
+    state = SessionState(session_id='s-' + 'x' * 40)
+    assert shop_agent.valid({'type': 'bidi_audio_input', 'audio': 'A' * 2732}, state)        # one 64 ms frame
+    assert not shop_agent.valid({'type': 'bidi_audio_input', 'audio': 'A' * (shop_agent.MAX_AUDIO_B64 + 1)}, state)

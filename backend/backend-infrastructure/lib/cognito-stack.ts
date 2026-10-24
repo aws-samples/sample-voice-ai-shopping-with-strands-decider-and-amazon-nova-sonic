@@ -83,6 +83,8 @@ export class CognitoStack extends cdk.Stack {
         {
           clientId: this.userPoolClient.userPoolClientId,
           providerName: this.userPool.userPoolProviderName,
+          // After a sign-out or a revoked refresh token, its ID token gets no AWS credentials.
+          serverSideTokenCheck: true,
         },
       ],
     });

@@ -27,6 +27,7 @@ import policy
 import questions
 import ui_events
 from decider_client import DeciderError, DeciderUnavailable
+from rate_limit import TokenBucket
 from state import SessionState
 
 logger = logging.getLogger(__name__)
@@ -34,14 +35,21 @@ logger = logging.getLogger(__name__)
 SHELF_SIZE = 12
 CANDIDATES = 49
 RETRIEVAL_LIMIT = 200
-# Shopper transcripts are personal data: kept out of the turn log unless switched on for debugging.
+# Shopper transcripts, the decider's answers and the replies are personal data: kept out of the
+# turn log unless switched on for debugging.
 LOG_TRANSCRIPTS = os.environ.get('LOG_TRANSCRIPTS', '').lower() == 'true'
+# Per session: at most this many decider calls in flight (one turn's worth), and new turns
+# (typed or spoken) at 1 a second with bursts of 5. A cancelled turn's calls keep their slots
+# until the decider answers them, so a flood of sentences cannot pile up work on the decider.
+DECIDER_SLOTS = 5
+TURN_RATE = (1.0, 5)
 
 
 def _cart_serialized(method):
     """One cart or order write at a time per session: a tapped remove and a turn's add could
     otherwise interleave, and the later response would overwrite the cart shown on screen."""
     async def wrapper(self, *args, **kwargs):
+        self._commit_point()   # before waiting for the lock: a confirmed write is never dropped
         async with self._cart_lock:
             return await method(self, *args, **kwargs)
     wrapper.__name__, wrapper.__doc__ = method.__name__, method.__doc__
@@ -107,6 +115,8 @@ class TurnPipeline:
         # instead of cancelling it: on 2026-10-21 a "yes" that had already added the jeans
         # was cancelled before it closed the product, and the next sentence added them again.
         self._committing: asyncio.Task | None = None
+        self._decider_slots = asyncio.Semaphore(DECIDER_SLOTS)
+        self._turns = TokenBucket(*TURN_RATE)
         self._round_answers: dict = {}
         self._background: set[asyncio.Task] = set()   # fire-and-forget work, kept referenced
         self._retrieval_filters: dict = {}
@@ -144,6 +154,11 @@ class TurnPipeline:
         after it, on the state it leaves."""
         if self._spec_timer:
             self._spec_timer.cancel()
+        if not self._turns.take():
+            logger.warning('⚠️ sentence dropped: more than %s turns a second', TURN_RATE[0])
+            dropped = asyncio.get_running_loop().create_future()
+            dropped.set_result({'directive': 'other', 'say': '', 'cart': cart_summary(self.state.cart)})
+            return dropped
         previous, after = self._turn_task, None
         if previous and not previous.done():
             if self._committing is previous:
@@ -227,13 +242,27 @@ class TurnPipeline:
     async def _ask(self, purpose: str, state_text: str, qs: dict) -> decider_client.DeciderResult:
         """A Strands Decider call, reported to the debug overlay with its answers."""
         try:
-            result = await self.deps.ask_decider(state_text, qs)
+            result = await self._decider_call(state_text, qs)
         except Exception:
             await self._activity('decider', f'Strands Decider 2B did not answer: {activity.PURPOSES.get(purpose, purpose)}')
             raise
         await self._activity('decider', activity.decider_title(purpose, len(qs)),
                              activity.answers_detail(result.answers, qs), result.client_ms)
         return result
+
+    async def _decider_call(self, state_text: str, qs: dict) -> decider_client.DeciderResult:
+        """One decider call in one of the session's slots. Cancelled while waiting for a slot, the
+        call is never sent; cancelled after, it is left to finish and frees its slot when it does
+        (InvokeEndpoint cannot be recalled), so the next turn waits instead of adding load."""
+        await self._decider_slots.acquire()
+        call = asyncio.ensure_future(self.deps.ask_decider(state_text, qs))
+
+        def done(task: asyncio.Future) -> None:
+            self._decider_slots.release()
+            if not task.cancelled():
+                task.exception()   # retrieved, so an abandoned call's error is not reported as unhandled
+        call.add_done_callback(done)
+        return await asyncio.shield(call)
 
     def _spawn(self, coro) -> None:
         task = asyncio.create_task(coro)
@@ -256,8 +285,10 @@ class TurnPipeline:
 
     # --------------------------------------------------------------------- turn
     def _commit_point(self) -> None:
-        """Called just before a cart or order write: from here the turn runs to its end."""
-        self._committing = asyncio.current_task()
+        """Called just before a cart or order write: from here the turn runs to its end. A tap
+        in the cart panel is not a turn and never stands in for one."""
+        if asyncio.current_task() is self._turn_task:
+            self._committing = self._turn_task
 
     async def _run_turn(self, text: str, outcome: asyncio.Future, after: asyncio.Task | None = None) -> None:
         try:
@@ -449,10 +480,11 @@ class TurnPipeline:
         if outcome['directive'] not in ('ask', 'no_match'):
             await deps.send(ui_events.status('listening', 'Listening'))
         logger.info('📋 turn %s', {'turn': turn, 'intent': plan.intent, 'band': plan.intent_band,
-                                   'directive': outcome['directive'], 'say': outcome.get('say', '')[:120], 'timings': timings,
-                                   **({'transcript': text[:200]} if LOG_TRANSCRIPTS else {}),
-                                   'answers': {q['id']: [(t['option'], t['p']) for t in q['top']]
-                                               for q in ui_events.debug_questions({**answers, **{f'{k} (re-check)': v for k, v in recheck.items()}, **self._round_answers})}})
+                                   'directive': outcome['directive'], 'timings': timings,
+                                   **({'transcript': text[:200], 'say': outcome.get('say', '')[:120],
+                                       'answers': {q['id']: [(t['option'], t['p']) for t in q['top']]
+                                                   for q in ui_events.debug_questions({**answers, **{f'{k} (re-check)': v for k, v in recheck.items()}, **self._round_answers})}}
+                                      if LOG_TRANSCRIPTS else {})})
         if deps.on_turn_end:
             self._spawn(deps.on_turn_end(state, {'turn': turn, 'transcript': text, 'outcome': outcome,
                                                          'timings': timings}))
@@ -710,7 +742,6 @@ class TurnPipeline:
     @_cart_serialized
     async def _add(self, turn: int, asin: str) -> dict:
         state, deps = self.state, self.deps
-        self._commit_point()
         try:
             started = time.perf_counter()
             result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'quantity': 1,
@@ -741,7 +772,6 @@ class TurnPipeline:
         if not state.cart.get('itemCount'):
             return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
         request = {'sessionId': state.session_id, 'idempotencyKey': request_key(state.session_id)}
-        self._commit_point()
         result = None
         for attempt in range(2):   # the same key: a retry returns the order instead of placing a second one
             try:
@@ -823,7 +853,6 @@ class TurnPipeline:
         """Removes the line, or with keep lowers it to that many."""
         state, deps = self.state, self.deps
         title = next((i['title'] for i in state.cart.get('items', []) if i['asin'] == asin), asin)
-        self._commit_point()
         try:
             started = time.perf_counter()
             request = {'sessionId': state.session_id, 'asin': asin, **({'keepQuantity': keep} if keep else {})}

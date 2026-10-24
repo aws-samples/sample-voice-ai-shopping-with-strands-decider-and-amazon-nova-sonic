@@ -172,4 +172,11 @@ describe('CognitoStack', () => {
   test('the authenticated role may only open the session host WebSocket', () => {
     expect(new Set(actionsOf(t.cognito))).toEqual(new Set(['bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream']));
   });
+
+  test('a revoked sign-in gets no AWS credentials', () => {
+    t.cognito.hasResourceProperties('AWS::Cognito::IdentityPool', {
+      AllowUnauthenticatedIdentities: false,
+      CognitoIdentityProviders: [Match.objectLike({ ServerSideTokenCheck: true })],
+    });
+  });
 });

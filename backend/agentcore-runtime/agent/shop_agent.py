@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import re
-import time
 import uuid
 
 import boto3
@@ -31,13 +30,17 @@ from sonic_bridge import SonicBridge
 from state import SessionState
 from tools_gateway import GatewayTools
 from questions import Catalog
+from rate_limit import TokenBucket
 from turn_pipeline import Deps, TurnPipeline
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger = logging.getLogger('shop_agent')
 
 MAX_INVALID_MESSAGES = 20
-MAX_AUDIO_B64 = 64 * 1024
+# The browser sends 64 ms frames (~2.7 KB in base64). A bigger frame would let a client push
+# audio into Sonic far faster than real time, within the message rate below.
+MAX_AUDIO_B64 = 8 * 1024
+MAX_MESSAGE_BYTES = 64 * 1024   # larger WebSocket messages are refused before they are parsed
 ASIN = re.compile(r'^[A-Z0-9]{10}$')
 SESSION_ID = re.compile(r'^[A-Za-z0-9-]{36,100}$')   # the cart tools' pattern
 SLOTS = {'recipient', 'gender', 'department', 'category', 'budget'}
@@ -88,23 +91,6 @@ async def catalog_meta() -> Catalog:
     catalog.department_descriptions = dict(item.get('departmentDescriptions') or {})
     catalog.category_descriptions = dict(item.get('categoryDescriptions') or {})
     return catalog
-
-
-class TokenBucket:
-    """Allows `rate` events a second with bursts up to `burst`."""
-
-    def __init__(self, rate: float, burst: int, clock=time.monotonic):
-        self.rate, self.burst, self.clock = rate, float(burst), clock
-        self.tokens, self.stamp = float(burst), clock()
-
-    def take(self) -> bool:
-        now = self.clock()
-        self.tokens = min(self.burst, self.tokens + (now - self.stamp) * self.rate)
-        self.stamp = now
-        if self.tokens >= 1:
-            self.tokens -= 1
-            return True
-        return False
 
 
 def limiter_for(buckets: dict, kind: str) -> TokenBucket:
@@ -176,14 +162,24 @@ async def websocket_endpoint(websocket: WebSocket):
     session_id = websocket.headers.get(SESSION_HEADER) or websocket.query_params.get('session_id') or ''
     if not SESSION_ID.match(session_id):   # the cart tools require 36-100 characters
         session_id = str(uuid.uuid4())
-    stored = await state_store.load(session_id)
+    try:
+        stored = await state_store.load(session_id)
+    except state_store.StateUnavailable:
+        stored = None
+        session_id = str(uuid.uuid4())   # ownership unknown: never reuse the id
     state = owned_state(stored, user['sub'])
     if stored is not None and state is None:
         # Someone else's session id: a new id, so their cart and orders stay out of reach.
         logger.warning('⚠️ session %s belongs to another shopper; starting a new session', session_id[:8])
         session_id = str(uuid.uuid4())
+    if state is None:
+        # Claim a new session id now (a conditional write), so nobody else can open it later,
+        # even before the first turn is saved; if the claim fails, use a fresh id.
+        state = SessionState(session_id=session_id, actor_id=user['sub'])
+        if not await state_store.save(state):
+            session_id = str(uuid.uuid4())
+            state = SessionState(session_id=session_id, actor_id=user['sub'])
     logger.info('🚀 session %s for actor %s', session_id[:8], user['sub'][:8])
-    state = state or SessionState(session_id=session_id, actor_id=user['sub'])
     restored = bool(state.turn_seq)
     memory = SessionMemory(actor_id=user['sub'], session_id=session_id)
     remembered, meta = await asyncio.gather(memory.remembered(), catalog_meta())
@@ -271,4 +267,5 @@ async def websocket_endpoint(websocket: WebSocket):
 if __name__ == '__main__':
     # AgentCore Runtime reaches the container on port 8080 from outside it; the microVM is
     # reachable only through AgentCore with SigV4, so binding all interfaces is required.
-    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '8080')), log_level='info')  # nosec B104
+    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '8080')), log_level='info',
+                ws_max_size=MAX_MESSAGE_BYTES)  # nosec B104

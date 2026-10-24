@@ -2,15 +2,16 @@
 # (ADR-22). x86_64, built by CodeBuild and pushed to ECR (no local Docker build).
 #
 # Base: the AWS Deep Learning Containers base image on Amazon ECR Public (AWS
-# verified), which carries the CUDA toolkit (nvcc, for causal-conv1d) and Python 3.12.
+# verified), which carries the CUDA toolkit and Python 3.12.
 # Container images must come from ECR, not from external registries such as
 # nvcr.io; the earlier build used nvcr.io/nvidia/cuda 12.4.1 (devel + runtime).
 # One stage: the base already includes the build tools, and a second stage would
 # need the same Python at the same path.
 #
 # Installed: strands-decider[cuda] at a pinned commit, torch 2.7.1 (cu126 wheels,
-# which bundle their own CUDA runtime) and causal-conv1d, compiled with the base's
-# CUDA toolkit. The model weights are NOT in the image: SageMaker mounts them
+# which bundle their own CUDA runtime) and causal-conv1d. causal-conv1d's setup.py downloads
+# its prebuilt wheel from GitHub Releases without a hash check, so that wheel is installed
+# directly, pinned by sha256: a replaced release asset fails the build. The model weights are NOT in the image: SageMaker mounts them
 # read-only at /opt/ml/model from S3 before the container starts (ModelDataSource).
 
 # Pinned by digest as well as tag, so a rebuild cannot pick up a different base image.
@@ -20,8 +21,8 @@ FROM ${BASE_IMAGE}
 ARG STRANDS_DECIDER_COMMIT=930e6d5de16309be32579f5631a7369a3322140c
 # The base image declares NVIDIA_REQUIRE_CUDA=cuda>=12.9, and the NVIDIA container runtime
 # refuses to start it on a host whose driver is older (SageMaker: CannotStartContainerError,
-# no container log, 2026-10-21). The 12.9 toolkit is needed only to build causal-conv1d;
-# at run time torch uses its bundled CUDA 12.6 libraries, as with the earlier 12.4 base.
+# no container log, 2026-10-21). The 12.9 toolkit is not used at run time:
+# torch uses its bundled CUDA 12.6 libraries, as with the earlier 12.4 base.
 ENV NVIDIA_DISABLE_REQUIRE=1
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 # The base also ships CUDA forward-compatibility driver libraries (cuda-compat, 12.9) ahead
@@ -41,7 +42,8 @@ RUN git clone https://github.com/strands-labs/strands-decider.git /opt/strands-d
     && git checkout "${STRANDS_DECIDER_COMMIT}" \
     && python3 -m pip install --no-cache-dir ".[cuda]"
 RUN python3 -m pip install --no-cache-dir --force-reinstall torch==2.7.1 --index-url https://download.pytorch.org/whl/cu126
-RUN python3 -m pip install --no-cache-dir causal-conv1d==1.7.0 --no-build-isolation
+ARG CAUSAL_CONV1D_WHEEL=https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0+cu12torch2.7cxx11abiTRUE-cp312-cp312-linux_x86_64.whl#sha256=b57df4acfae0096cdac7603cb390074df30e5ee8f35d51228a720c3c6f70d3e2
+RUN python3 -m pip install --no-cache-dir --no-deps "${CAUSAL_CONV1D_WHEEL}"
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 COPY serve.py /opt/program/serve.py
