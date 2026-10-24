@@ -38,6 +38,7 @@
   .notes .b{flex:0 0 20px;height:20px;border-radius:50%;background:#232F3E;color:#fff;font-size:10px;font-weight:bold;text-align:center;line-height:20px;margin-right:8px;}
   .notes .b.dep{background:#7D8998;}
   .notes .x{flex:1;line-height:1.35;}
+  .tag.clear{background:transparent;}
   .tag{position:absolute;font-size:8.6px;color:#545B64;background:#fff;padding:0 3px;z-index:5;}
   .foot{position:absolute;left:30px;bottom:14px;font-size:9px;color:#879196;}
   svg.lines{position:absolute;left:0;top:0;width:1600px;height:910px;pointer-events:none;}
@@ -94,7 +95,7 @@
   <!-- Row 3: A backend infrastructure -->
   <div class="section" style="left:220px;top:615px;width:1005px;height:230px;"><div class="section-label">Section A</div></div>
   <div class="vpc" style="left:235px;top:650px;width:300px;height:180px;">
-    <div class="vpc-label" style="left:76px;top:-10px;"><img src="icons/vpc.svg"/>VPC (1 zone; 2+ in production)</div>
+    <div class="vpc-label" style="left:76px;top:7px;background:transparent;"><img src="icons/vpc.svg"/>VPC (1 zone; 2+ in production)</div>
   </div>
   <div class="svc" style="left:244px;top:690px;width:116px;"><img src="icons/lambda.svg"/><div class="n">search_catalog,<br/>index writer</div><div class="d">Lambda functions in an<br/>isolated subnet, no<br/>internet route</div></div>
   <div class="svc" style="left:400px;top:690px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch Serverless,<br/>Bedrock runtime,<br/>S3 (gateway)</div></div>
@@ -131,15 +132,15 @@
 
   <div class="tag" style="left:250px;top:70px;">SigV4 WebSocket: audio, text, UI events</div>
   <div class="tag" style="left:800px;top:354px;">InvokeEndpoint: typed questions, calibrated answers</div>
-  <div class="tag" style="left:604px;top:300px;">MCP tool calls</div>
-  <div class="tag" style="left:580px;top:224px;">preferences</div>
-  <div class="tag" style="left:316px;top:224px;">sign-in</div>
-  <div class="tag" style="left:868px;top:620px;">product detail, cart, orders</div>
+  <div class="tag clear" style="left:604px;top:300px;">MCP tool calls</div>
+  <div class="tag clear" style="left:580px;top:224px;">preferences</div>
+  <div class="tag clear" style="left:316px;top:224px;">sign-in</div>
+  <div class="tag clear" style="left:868px;top:620px;">product detail, cart, orders</div>
   <div class="tag" style="left:560px;top:856px;">presigned image URLs</div>
   <div class="tag" style="left:678px;top:717px;">embed query</div>
   <div class="tag" style="left:530px;top:594px;color:#5A2BB5;">search_catalog runs here</div>
   <div class="tag" style="left:518px;top:697px;color:#5A2BB5;">private</div>
-  <div class="tag" style="left:428px;top:611px;color:#7D8998;">catalog load</div>
+  <div class="tag clear" style="left:428px;top:611px;color:#7D8998;">catalog load</div>
 
   <div class="step" style="left:166px;top:208px;">1</div>
   <div class="step" style="left:440px;top:66px;">2</div>
