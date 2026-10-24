@@ -13,7 +13,7 @@ import shop_agent
 import turn_pipeline
 from state import SessionState
 
-from tests.test_turn_pipeline import CATALOG, FakeTools, MOM, make, run
+from tests.test_turn_pipeline import CATALOG, FakeTools, MOM, ans, make, run
 
 
 def test_a_stored_session_opens_only_for_its_owner():
@@ -136,10 +136,14 @@ def test_a_flood_of_sentences_is_dropped_beyond_the_turn_limit():
     async def go():
         p, _, decider, _ = make(MOM)
         outcomes = [p.on_final(f'a gift for my mom {i}') for i in range(8)]
-        dropped = [o for o in outcomes if o.done() and o.result().get('directive') == 'other']
+        dropped = [o for o in outcomes if o.done() and o.result().get('directive') == 'hold']
+        latest = p._outcome
         await p._turn_task
-        return dropped
-    dropped = run(go())
+        return dropped, latest
+    dropped, latest = run(go())
+    # The newest sentence was dropped, so Sonic gets "One moment." for it, not an older reply.
+    assert latest.result() == {'directive': 'hold', 'say': 'One moment.', 'speak': False,
+                               'cart': turn_pipeline.cart_summary({'items': [], 'itemCount': 0, 'totalCents': 0})}
     assert len(dropped) == 8 - turn_pipeline.TURN_RATE[1]
 
 
@@ -225,3 +229,27 @@ def test_an_oversized_audio_frame_is_invalid():
     state = SessionState(session_id='s-' + 'x' * 40)
     assert shop_agent.valid({'type': 'bidi_audio_input', 'audio': 'A' * 2732}, state)        # one 64 ms frame
     assert not shop_agent.valid({'type': 'bidi_audio_input', 'audio': 'A' * (shop_agent.MAX_AUDIO_B64 + 1)}, state)
+
+
+def test_a_sentence_after_a_waiting_turn_also_waits_for_the_cart_write():
+    """A "yes" is adding; the next sentence waits for it; a third sentence replaces the waiting
+    one and must wait for the add too, not run alongside it."""
+    async def go():
+        p, tools, _, _ = make(MOM, tools=FakeTools(add_delay=0.2))
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95)}
+        first = p.on_final('yes')
+        await asyncio.sleep(0.05)   # the add is in flight
+        p.on_final('and also')
+        started_after_add = []
+        turn = p._turn
+
+        async def recording_turn(text):
+            started_after_add.append(first.done())
+            return await turn(text)
+        p._turn = recording_turn
+        await p.on_final('show me more like this')
+        return started_after_add
+    assert run(go()) == [True]

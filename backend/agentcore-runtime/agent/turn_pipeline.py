@@ -38,10 +38,11 @@ RETRIEVAL_LIMIT = 200
 # Shopper transcripts, the decider's answers and the replies are personal data: kept out of the
 # turn log unless switched on for debugging.
 LOG_TRANSCRIPTS = os.environ.get('LOG_TRANSCRIPTS', '').lower() == 'true'
-# Per session: at most this many decider calls in flight (one turn's worth), and new turns
-# (typed or spoken) at 1 a second with bursts of 5. A cancelled turn's calls keep their slots
-# until the decider answers them, so a flood of sentences cannot pile up work on the decider.
-DECIDER_SLOTS = 5
+# Per connection: at most this many decider calls in flight (two turns' worth, so a shopper who
+# corrects themselves never waits), and new turns (typed or spoken) at 1 a second with bursts
+# of 5. A cancelled turn's calls keep their slots until the decider answers them, so a flood of
+# sentences cannot pile up work on the decider.
+DECIDER_SLOTS = 10
 TURN_RATE = (1.0, 5)
 
 
@@ -155,16 +156,21 @@ class TurnPipeline:
         if self._spec_timer:
             self._spec_timer.cancel()
         if not self._turns.take():
+            # Over the turn limit: this sentence is the newest outcome, so Sonic does not
+            # repeat the previous turn's reply for it.
             logger.warning('⚠️ sentence dropped: more than %s turns a second', TURN_RATE[0])
-            dropped = asyncio.get_running_loop().create_future()
-            dropped.set_result({'directive': 'other', 'say': '', 'cart': cart_summary(self.state.cart)})
-            return dropped
-        previous, after = self._turn_task, None
-        if previous and not previous.done():
-            if self._committing is previous:
-                after = previous
-            else:
-                previous.cancel()
+            self._outcome = asyncio.get_running_loop().create_future()
+            self._outcome.set_result({'directive': 'hold', 'say': 'One moment.', 'speak': False,
+                                      'cart': cart_summary(self.state.cart)})
+            self._spawn(self.deps.send(ui_events.status('degraded', 'That was too fast. Please say it again.')))
+            return self._outcome
+        previous = self._turn_task
+        # Any turn still writing, not only the latest one: a turn waiting behind it is
+        # replaced, and the new turn waits for the write as well.
+        committing = self._committing
+        after = committing if committing and not committing.done() else None
+        if previous and not previous.done() and previous is not after:
+            previous.cancel()
         loop = asyncio.get_running_loop()
         self._outcome = loop.create_future()
         outcome = self._outcome

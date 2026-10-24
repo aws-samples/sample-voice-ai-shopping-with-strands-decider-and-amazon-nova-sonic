@@ -10,7 +10,7 @@
  * Output: { cart: {items, itemCount, totalCents} }
  *      or { error: "NotFound" | "Unavailable" | "QuantityLimit" }
  */
-const { GetCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
+const { GetCommand, TransactWriteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const { ddb, productKey } = require('../shared/aws');
 const { cartPk, readCartItems, summarizeCart, cancellationReasons } = require('../shared/cart');
 const { ASIN_PATTERN, SESSION_ID_PATTERN, runTool, requireString, optionalInt } = require('../shared/validation');
@@ -34,8 +34,22 @@ async function run({ sessionId, asin, quantity, idempotencyKey }) {
   if (!product) return { error: 'NotFound', message: `No product with asin ${asin}` };
   if (product.available === false) return { error: 'Unavailable', message: `${asin} is not available` };
 
-  const expiresAt = Math.floor(Date.now() / 1000) + CART_TTL_SECONDS;
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + CART_TTL_SECONDS;
   const table = process.env.CART_TABLE_NAME;
+  // An expired line that DynamoDB has not deleted yet starts again from zero, so adding to it
+  // does not bring back its old quantity (cart reads already skip it).
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: table,
+      Key: { PK: cartPk(sessionId), SK: `ITEM#${asin}` },
+      UpdateExpression: 'SET quantity = :zero',
+      ConditionExpression: 'expiresAt <= :now',
+      ExpressionAttributeValues: { ':zero': 0, ':now': now },
+    }));
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') throw err;
+  }
   try {
     await ddb.send(
       new TransactWriteCommand({

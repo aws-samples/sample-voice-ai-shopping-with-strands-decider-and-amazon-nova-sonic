@@ -1,7 +1,9 @@
 /**
  * Cart reads shared by add-to-cart and place-order. Reads are strongly
  * consistent (a write is visible to the read right after it), and totals are
- * always summed from integer priceCents, never floats.
+ * always summed from integer priceCents, never floats. Lines past their
+ * expiresAt are skipped: DynamoDB deletes expired items only eventually, and a
+ * cart must not outlive the session state that owns it.
  */
 const { QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const { ddb } = require('./aws');
@@ -18,7 +20,8 @@ async function readCartItems(sessionId) {
       new QueryCommand({
         TableName: process.env.CART_TABLE_NAME,
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :item)',
-        ExpressionAttributeValues: { ':pk': cartPk(sessionId), ':item': 'ITEM#' },
+        FilterExpression: 'attribute_not_exists(expiresAt) OR expiresAt > :now',
+        ExpressionAttributeValues: { ':pk': cartPk(sessionId), ':item': 'ITEM#', ':now': Math.floor(Date.now() / 1000) },
         ExclusiveStartKey: exclusiveStartKey,
         ConsistentRead: true,
       }),

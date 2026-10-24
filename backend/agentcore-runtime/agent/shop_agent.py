@@ -38,8 +38,8 @@ logger = logging.getLogger('shop_agent')
 
 MAX_INVALID_MESSAGES = 20
 # The browser sends 64 ms frames (~2.7 KB in base64). A bigger frame would let a client push
-# audio into Sonic far faster than real time, within the message rate below.
-MAX_AUDIO_B64 = 8 * 1024
+# audio into Sonic faster than real time: with the message rate below, at most ~4x.
+MAX_AUDIO_B64 = 4 * 1024
 MAX_MESSAGE_BYTES = 64 * 1024   # larger WebSocket messages are refused before they are parsed
 ASIN = re.compile(r'^[A-Z0-9]{10}$')
 SESSION_ID = re.compile(r'^[A-Za-z0-9-]{36,100}$')   # the cart tools' pattern
