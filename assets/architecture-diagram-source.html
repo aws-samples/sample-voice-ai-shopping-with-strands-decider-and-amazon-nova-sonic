@@ -32,9 +32,11 @@
   .svc .n{font-size:10px;font-weight:600;margin-top:5px;line-height:1.15;}
   .svc .d{font-size:8.4px;color:#545B64;line-height:1.2;margin-top:2px;}
   .step{position:absolute;width:20px;height:20px;border-radius:50%;background:#232F3E;color:#fff;font-size:10px;font-weight:bold;text-align:center;line-height:20px;z-index:6;}
-  .notes{position:absolute;left:1262px;top:118px;width:300px;font-size:10.4px;}
+  .notes{position:absolute;left:1258px;top:92px;width:300px;padding:12px 14px;font-size:10px;background:#F2F3F3;border-radius:6px;}
+  .notes b{font-weight:700;}
+  .notes code{font-size:9.5px;}
   .notes h3{font-size:11.5px;margin:0 0 9px 0;}
-  .notes .row{display:flex;margin-bottom:9px;}
+  .notes .row{display:flex;margin-bottom:8px;}
   .notes .b{flex:0 0 20px;height:20px;border-radius:50%;background:#232F3E;color:#fff;font-size:10px;font-weight:bold;text-align:center;line-height:20px;margin-right:8px;}
   .notes .b.dep{background:#7D8998;}
   .notes .x{flex:1;line-height:1.35;}
@@ -152,15 +154,16 @@
 
   <div class="notes">
     <h3>One spoken sentence</h3>
-    <div class="row"><div class="b">1</div><div class="x">The shopper signs in with Cognito; the Identity Pool gives the browser temporary credentials for one thing only: the session host WebSocket.</div></div>
-    <div class="row"><div class="b">2</div><div class="x">The browser opens a SigV4-signed WebSocket to the session host on AgentCore Runtime and streams mic audio (or typed text).</div></div>
-    <div class="row"><div class="b">3</div><div class="x">Nova 2.5 Sonic transcribes; it speaks only with Voice on, or to ask a yes/no question. Partial transcripts start a speculative catalog search; the final one starts the turn.</div></div>
-    <div class="row"><div class="b">4</div><div class="x">The host asks Strands Decider typed questions: intent, who it is for, department, then category within it, budget, which card. Each answer has a calibrated confidence: act, ask one question, or offer a yes/no.</div></div>
-    <div class="row"><div class="b">5</div><div class="x">Tools run through AgentCore Gateway to five Lambda functions. Code enforces every committed filter. Memory keeps preferences for the next visit.</div></div>
-    <div class="row"><div class="b">6</div><div class="x">search_catalog runs in a VPC: it embeds the query with Titan and runs a filtered vector search in OpenSearch Serverless through the collection's VPC endpoint. The cart and orders are DynamoDB transactions.</div></div>
-    <div class="row"><div class="b">7</div><div class="x">Chips and the shelf update first (about 1 s); product images arrive as presigned S3 URLs.</div></div>
-    <h3 style="margin-top:14px;">Deploy time</h3>
-    <div class="row"><div class="b dep">D</div><div class="x">deploy-all.sh builds the images in CodeBuild (no local Docker), creates the endpoint, and loads the generated catalog from the repository zip; a function inside the VPC writes the search index.</div></div>
+    <div class="row"><div class="b">1</div><div class="x">The shopper opens the React web app, hosted on <b>AWS Amplify Hosting</b>, in a browser on a computer or phone, and signs in. <b>Amazon Cognito</b> authenticates them and returns JWT tokens; its identity pool exchanges them for temporary AWS credentials that allow one action only: opening the session host WebSocket.</div></div>
+    <div class="row"><div class="b">2</div><div class="x">The browser opens a SigV4-signed WebSocket to the session host on <b>Amazon Bedrock AgentCore Runtime</b>, one microVM per shopping session. The first message carries the Cognito token, which the host verifies before anything else. Mic audio then streams in 64 ms frames, or the shopper types.</div></div>
+    <div class="row"><div class="b">3</div><div class="x"><b>Amazon Nova 2.5 Sonic</b> on <b>Amazon Bedrock</b> transcribes speech as it arrives. Partial transcripts start a speculative catalog search; the final transcript starts the turn. Sonic replies out loud only when Voice is on, or to ask a yes/no question.</div></div>
+    <div class="row"><div class="b">4</div><div class="x">The turn pipeline asks <b>Strands Decider 2B</b> on an <b>Amazon SageMaker AI</b> real-time endpoint typed questions in parallel: intent, who it is for, department, category, which card, and change-of-mind re-checks. Each answer returns with a calibrated probability, and per-question thresholds decide: act, show results and ask one question, or treat it as not said. Exact numbers such as budgets are parsed in code.</div></div>
+    <div class="row"><div class="b">5</div><div class="x">Tool calls go over MCP, with IAM authentication, through <b>Amazon Bedrock AgentCore Gateway</b> to five <b>AWS Lambda</b> functions. Code applies every committed chip as a hard filter. <b>AgentCore Memory</b> keeps the shopper&#39;s preferences for the next visit.</div></div>
+    <div class="row"><div class="b">6</div><div class="x">search_catalog runs in an isolated VPC subnet: it embeds the query with <b>Amazon Titan Text Embeddings V2</b> and runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>, both through VPC endpoints. The product detail, cart and order tools use <b>Amazon DynamoDB</b>; cart and order writes are idempotent transactions.</div></div>
+    <div class="row"><div class="b">7</div><div class="x">Chips and the shelf update first, in about a second. Product images load from a private <b>Amazon S3</b> bucket through presigned URLs valid for one hour. An order always needs a separate yes, and no payment is taken.</div></div>
+    <h3 style="margin-top:12px;">Deploy and operations</h3>
+    <div class="row"><div class="b dep">D</div><div class="x"><code>deploy-all.sh</code> deploys the stacks with the <b>AWS CDK</b>. <b>AWS CodeBuild</b> builds both container images (no local Docker) into <b>Amazon ECR</b>, copies the pinned model weights to Amazon S3, and loads the generated catalog into Amazon S3, Amazon DynamoDB and the search index.</div></div>
+    <div class="row"><div class="b dep">O</div><div class="x"><b>Amazon CloudWatch</b> keeps logs, per-turn records and latency metrics. <b>AWS IAM</b> gives each component its own least-privilege role.</div></div>
   </div>
 
   <div class="foot">VoiceShop sample. Every product, brand and image in the catalog is generated. Icons: AWS Architecture Icons.</div>
