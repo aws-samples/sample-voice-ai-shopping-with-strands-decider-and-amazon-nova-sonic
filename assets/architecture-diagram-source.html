@@ -67,7 +67,7 @@
   <!-- Row 1: F frontend, E session host, C decision model -->
   <div class="section" style="left:220px;top:135px;width:230px;height:210px;"><div class="section-label">Section F</div></div>
   <div class="sub" style="left:232px;top:165px;width:206px;height:168px;background:#F1F8FF;border-color:#7AA7D9;"><div class="sub-label">Sign-in and hosting</div></div>
-  <div class="svc" style="left:236px;top:195px;"><img src="icons/amplify.svg"/><div class="n">AWS Amplify Hosting</div><div class="d">serves the React app</div></div>
+  <div class="svc" style="left:236px;top:195px;"><img src="icons/amplify.svg"/><div class="n">AWS Amplify</div><div class="d">serves the React app</div></div>
   <div class="svc" style="left:330px;top:195px;"><img src="icons/cognito.svg"/><div class="n">Amazon Cognito</div><div class="d">user pool +<br/>identity pool</div></div>
 
   <div class="section" style="left:470px;top:135px;width:420px;height:210px;"><div class="section-label">Section E</div></div>
@@ -101,10 +101,10 @@
   <!-- Row 3: A backend infrastructure -->
   <div class="section" style="left:220px;top:615px;width:1005px;height:230px;"><div class="section-label">Section A</div></div>
   <div class="vpc" style="left:235px;top:650px;width:300px;height:180px;">
-    <div class="vpc-label" style="left:76px;top:7px;background:transparent;"><img src="icons/vpc.svg"/>VPC (1 zone; 2+ in production)</div>
+    <div class="vpc-label" style="right:8px;top:7px;background:transparent;"><img src="icons/vpc.svg"/>VPC (1 AZ; 2+ in production)</div>
   </div>
-  <div class="svc" style="left:244px;top:690px;width:116px;"><img src="icons/lambda.svg"/><div class="n">search_catalog,<br/>index writer</div><div class="d">Lambda functions in an<br/>isolated subnet, no<br/>internet route</div></div>
-  <div class="svc" style="left:400px;top:690px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch Serverless,<br/>Bedrock runtime,<br/>S3 (gateway)</div></div>
+  <div class="svc" style="left:264px;top:690px;width:116px;"><img src="icons/lambda.svg"/><div class="n">search_catalog,<br/>index writer</div><div class="d">Lambda functions in an<br/>isolated subnet, no<br/>internet route</div></div>
+  <div class="svc" style="left:390px;top:690px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch Serverless,<br/>Bedrock runtime,<br/>S3 (gateway)</div></div>
   <div class="sub" style="left:555px;top:650px;width:655px;height:180px;background:#EBF8F3;border-color:#3FA77A;"><div class="sub-label">Catalog, cart and orders</div></div>
   <div class="svc" style="left:575px;top:690px;"><img src="icons/opensearch.svg"/><div class="n">OpenSearch Serverless</div><div class="d">vector search + hard filters;<br/>VPC endpoint only</div></div>
   <div class="svc" style="left:735px;top:690px;"><img src="icons/bedrock.svg"/><div class="n">Titan Text Embeddings V2</div><div class="d">on Amazon Bedrock</div></div>
@@ -126,13 +126,14 @@
     <path d="M668 287 V431" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
     <path d="M693 458 H805" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
     <path d="M845 524 V632 H957 V686" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
-    <path d="M820 524 V600 H302 V686" stroke="#8C4FFF" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrv)"/>
-    <path d="M477 713 H600" stroke="#8C4FFF" stroke-width="1.8" fill="none" marker-end="url(#arrv)"/>
-    <path d="M652 713 H760" stroke="#232F3E" stroke-width="1.2" fill="none" marker-end="url(#arr)"/>
+    <path d="M820 524 V600 H310 V686" stroke="#8C4FFF" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrv)"/>
+    <path d="M347 713 H421" stroke="#8C4FFF" stroke-width="1.6" fill="none" marker-end="url(#arrv)"/>
+    <path d="M473 713 H600" stroke="#8C4FFF" stroke-width="1.8" fill="none" marker-end="url(#arrv)"/>
+    <path d="M448 792 V814 H787 V784" stroke="#8C4FFF" stroke-width="1.6" fill="none" marker-end="url(#arrv)"/>
     <path d="M1127 772 V862 H112 V292" stroke="#232F3E" stroke-width="1.3" stroke-dasharray="5,4" fill="none" marker-end="url(#arr)"/>
     <path d="M311 218 H357" stroke="#232F3E" stroke-width="1.4" fill="none" marker-end="url(#arr)"/>
     <path d="M311 458 H357" stroke="#7D8998" stroke-width="1.5" fill="none" marker-end="url(#arrg)"/>
-    <path d="M382 534 V608 H520 V646" stroke="#7D8998" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrg)"/>
+    <path d="M382 534 V640 H336 V686" stroke="#7D8998" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrg)"/>
     <path d="M1005 421 H1110" stroke="#7D8998" stroke-width="1.5" fill="none" marker-end="url(#arrg)"/>
   </svg>
 
@@ -143,10 +144,10 @@
   <div class="tag clear" style="left:316px;top:224px;">sign-in</div>
   <div class="tag clear" style="left:868px;top:620px;">product detail, cart, orders</div>
   <div class="tag" style="left:560px;top:856px;">presigned image URLs</div>
-  <div class="tag" style="left:678px;top:717px;">embed query</div>
+  <div class="tag clear" style="left:560px;top:816px;color:#5A2BB5;">embed query (Bedrock runtime endpoint)</div>
   <div class="tag" style="left:530px;top:594px;color:#5A2BB5;">search_catalog runs here</div>
-  <div class="tag" style="left:518px;top:697px;color:#5A2BB5;">private</div>
-  <div class="tag clear" style="left:428px;top:611px;color:#7D8998;">catalog load</div>
+  <div class="tag clear" style="left:476px;top:699px;color:#5A2BB5;">vector search</div>
+  <div class="tag clear" style="left:388px;top:628px;color:#7D8998;">catalog load: invokes the index writer</div>
 
   <div class="step" style="left:166px;top:208px;">1</div>
   <div class="step" style="left:440px;top:66px;">2</div>
@@ -158,7 +159,7 @@
 
   <div class="notes">
     <h3>One spoken sentence</h3>
-    <div class="row"><div class="b">1</div><div class="x">The shopper opens the React web app, hosted on <b>AWS Amplify Hosting</b>, in a browser on a computer or phone, and signs in. <b>Amazon Cognito</b> authenticates them and returns JWT tokens; its identity pool exchanges them for temporary AWS credentials that allow one action only: opening the session host WebSocket.</div></div>
+    <div class="row"><div class="b">1</div><div class="x">The shopper opens the React web app, hosted on <b>AWS Amplify</b>, in a browser on a computer or phone, and signs in. <b>Amazon Cognito</b> authenticates them and returns JWT tokens; its identity pool exchanges them for temporary AWS credentials that allow one action only: opening the session host WebSocket.</div></div>
     <div class="row"><div class="b">2</div><div class="x">The browser opens a SigV4-signed WebSocket to the session host on <b>Amazon Bedrock AgentCore Runtime</b>, one microVM per shopping session. The first message carries the Cognito token, which the host verifies before anything else. Mic audio then streams in 64 ms frames, or the shopper types.</div></div>
     <div class="row"><div class="b">3</div><div class="x"><b>Amazon Nova 2.5 Sonic</b> on <b>Amazon Bedrock</b> transcribes speech as it arrives. Partial transcripts start a speculative catalog search; the final transcript starts the turn. Sonic replies out loud only when Voice is on, or to ask a yes/no question.</div></div>
     <div class="row"><div class="b">4</div><div class="x">The turn pipeline asks <b>Strands Decider 2B</b> on an <b>Amazon SageMaker AI</b> real-time endpoint typed questions in parallel: intent, who it is for, department, category, which card, and change-of-mind re-checks. Each answer returns with a calibrated probability, and per-question thresholds decide: act, show results and ask one question, or treat it as not said. Exact numbers such as budgets are parsed in code.</div></div>
