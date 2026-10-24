@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   VoiceShop architecture diagram source. Render to assets/architecture-diagram.png
-  at 1600x910 (for example with a headless browser screenshot).
+  at 1600x960 (for example with a headless browser screenshot).
   Icons: the official AWS Architecture Icons package (aws.amazon.com/architecture/icons),
   copied into assets/icons/ (not committed) under the file names used below.
 -->
@@ -10,7 +10,7 @@
 <meta charset="utf-8"/>
 <style>
   body{margin:0;background:#fff;font-family:Helvetica,Arial,sans-serif;color:#232F3E;}
-  .canvas{position:relative;width:1600px;height:910px;margin:0 auto;background:#fff;}
+  .canvas{position:relative;width:1600px;height:960px;margin:0 auto;background:#fff;}
   .title{position:absolute;left:30px;top:18px;font-size:20px;font-weight:bold;}
   .subtitle{position:absolute;left:30px;top:46px;width:1540px;font-size:11px;color:#545B64;}
   .boundary{position:absolute;border:2px solid #232F3E;border-radius:6px;}
@@ -42,8 +42,12 @@
   .notes .x{flex:1;line-height:1.35;}
   .tag.clear{background:transparent;}
   .tag{position:absolute;font-size:8.6px;color:#545B64;background:#fff;padding:0 3px;z-index:5;}
-  .foot{position:absolute;left:30px;bottom:14px;font-size:9px;color:#879196;}
-  svg.lines{position:absolute;left:0;top:0;width:1600px;height:910px;pointer-events:none;}
+  .foot{position:absolute;left:0;right:0;bottom:0;height:58px;background:#FAFAFA;}
+  .foot-logo{position:absolute;left:28px;top:9px;width:64px;height:40px;}
+  .foot-text{position:absolute;left:108px;top:14px;font-size:11px;line-height:1.45;color:#545B64;}
+  .foot-text i{color:#7D8998;}
+  .foot-ref{position:absolute;right:270px;top:19px;font-size:17px;font-weight:bold;color:#FF9900;}
+  svg.lines{position:absolute;left:0;top:0;width:1600px;height:960px;pointer-events:none;}
 </style>
 </head>
 <body>
@@ -166,7 +170,11 @@
     <div class="row"><div class="b dep">O</div><div class="x"><b>Amazon CloudWatch</b> keeps logs, per-turn records and latency metrics. <b>AWS IAM</b> gives each component its own least-privilege role.</div></div>
   </div>
 
-  <div class="foot">VoiceShop sample. Every product, brand and image in the catalog is generated. Icons: AWS Architecture Icons.</div>
+  <div class="foot">
+    <img src="icons/aws-logo.svg" class="foot-logo"/>
+    <div class="foot-text"><i>Reviewed for technical accuracy October, 2026</i><br/>&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+    <div class="foot-ref">AWS Reference Architecture</div>
+  </div>
 </div>
 </body>
 </html>
