@@ -202,8 +202,9 @@ export function useShopSession(transport: SessionTransport) {
       if (message.type === 'ui.question' && !mic.current) listenForAnswer.current();
       if (message.type === 'ui.scroll') {
         // A view change only: the page moves, the state does not.
-        // The product area scrolls (the header and footer are fixed); the window on small screens.
-        const area = document.querySelector<HTMLElement>('.layout__main');
+        // An open product's details sheet scrolls itself; otherwise the product area (the header
+        // and footer are fixed), or the window on small screens.
+        const area = document.querySelector<HTMLElement>('.sheet') ?? document.querySelector<HTMLElement>('.layout__main');
         const target: HTMLElement | Window = area && area.scrollHeight > area.clientHeight ? area : window;
         const step = (area?.clientHeight ?? window.innerHeight) * 0.8;
         if (message.direction === 'top') target.scrollTo({ top: 0, behavior: 'smooth' });
