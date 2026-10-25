@@ -155,18 +155,18 @@
 
   <div class="notes">
     <h3>One spoken sentence</h3>
-    <div class="row"><div class="b">1</div><div class="x">The shopper opens the React web app on <b>AWS Amplify</b>.</div></div>
-    <div class="row"><div class="b">2</div><div class="x"><b>Amazon Cognito</b> signs the shopper in and returns JWT tokens; its identity pool gives credentials that can only open the WebSocket.</div></div>
-    <div class="row"><div class="b">3</div><div class="x">The browser opens a SigV4-signed WebSocket to the session host on <b>Amazon Bedrock AgentCore Runtime</b> and streams mic audio or text.</div></div>
-    <div class="row"><div class="b">4</div><div class="x"><b>Amazon Nova 2.5 Sonic</b>, a speech-to-speech model on <b>Amazon Bedrock</b>, returns transcripts and speaks the app&#39;s reply.</div></div>
-    <div class="row"><div class="b">5</div><div class="x">The session host asks <b>Strands Decider 2B</b> on <b>Amazon SageMaker AI</b> typed questions; per-question thresholds on the calibrated answers decide to act, ask one question, or ignore.</div></div>
-    <div class="row"><div class="b">6</div><div class="x">Tools run over MCP through <b>Amazon Bedrock AgentCore Gateway</b> on five <b>AWS Lambda</b> functions; <b>AgentCore Memory</b> keeps preferences.</div></div>
-    <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> function, in an isolated VPC subnet, embeds the query with <b>Amazon Titan Text Embeddings V2</b> (7a) and searches <b>Amazon OpenSearch Serverless</b> (7b) through VPC endpoints.</div></div>
-    <div class="row"><div class="b">8</div><div class="x">Product detail, cart and order tools use <b>Amazon DynamoDB</b>; the session host saves its own state there directly.</div></div>
-    <div class="row"><div class="b">9</div><div class="x">Chips (preference labels) and the shelf update in about a second; images load from a private <b>Amazon S3</b> bucket through presigned URLs.</div></div>
+    <div class="row"><div class="b">1</div><div class="x">The shopper opens the React web app on <b>AWS Amplify</b>, in a browser on a computer or phone.</div></div>
+    <div class="row"><div class="b">2</div><div class="x">The app signs the shopper in with <b>Amazon Cognito</b>, which returns JWT tokens. The identity pool exchanges them for temporary AWS credentials that allow one action only: opening the session host WebSocket.</div></div>
+    <div class="row"><div class="b">3</div><div class="x">The browser opens a SigV4-signed WebSocket to the session host on <b>Amazon Bedrock AgentCore Runtime</b>, one microVM per shopping session. The host verifies the Cognito token in the first message. Mic audio then streams in 64 ms frames, or the shopper types.</div></div>
+    <div class="row"><div class="b">4</div><div class="x"><b>Amazon Nova 2.5 Sonic</b> on <b>Amazon Bedrock</b>, a speech-to-speech model, returns text transcripts of what the shopper said: partial transcripts start a speculative search, and the final one starts the turn. It speaks the reply the app gives it, out loud only when Voice is on or to ask a yes/no question.</div></div>
+    <div class="row"><div class="b">5</div><div class="x">The turn pipeline asks <b>Strands Decider 2B</b> on an <b>Amazon SageMaker AI</b> real-time endpoint typed questions in parallel: intent, who it is for, department, category, which card, and change-of-mind re-checks. Each answer returns with a calibrated probability, and per-question thresholds decide: act, show results and ask one question, or treat it as not said.</div></div>
+    <div class="row"><div class="b">6</div><div class="x">Tool calls go over MCP, with IAM authentication, through <b>Amazon Bedrock AgentCore Gateway</b> to five <b>AWS Lambda</b> functions. <b>AgentCore Memory</b> keeps the shopper&#39;s preferences for the next visit.</div></div>
+    <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it (7a) embeds the shopper&#39;s query with <b>Amazon Titan Text Embeddings V2</b>, then (7b) runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>.</div></div>
+    <div class="row"><div class="b">8</div><div class="x">The product detail, cart and order tools use <b>Amazon DynamoDB</b>. Cart and order writes are idempotent transactions; an order always needs a separate yes, and no payment is taken. The session host saves its own session state to the Sessions table directly.</div></div>
+    <div class="row"><div class="b">9</div><div class="x">The screen updates first, in about a second: the shelf, and chips, small labels such as For: Mom or Under $80 that show each preference the app understood. Product images load from a private <b>Amazon S3</b> bucket through presigned URLs valid for one hour.</div></div>
     <h3 style="margin-top:12px;">Deploy and operations</h3>
-    <div class="row"><div class="b dep">D</div><div class="x"><code>deploy-all.sh</code> deploys with the <b>AWS CDK</b>; <b>AWS CodeBuild</b> builds the images into <b>Amazon ECR</b> and loads the catalog.</div></div>
-    <div class="row"><div class="b dep">O</div><div class="x"><b>Amazon CloudWatch</b> keeps logs and metrics; <b>AWS IAM</b> gives each component a least-privilege role.</div></div>
+    <div class="row"><div class="b dep">D</div><div class="x"><code>deploy-all.sh</code> deploys the stacks with the <b>AWS CDK</b>. <b>AWS CodeBuild</b> builds both container images into <b>Amazon ECR</b>, copies the pinned model weights to Amazon S3, and loads the generated catalog into Amazon S3, Amazon DynamoDB and the search index.</div></div>
+    <div class="row"><div class="b dep">O</div><div class="x"><b>Amazon CloudWatch</b> keeps logs, per-turn records and latency metrics. <b>AWS IAM</b> gives each component its own least-privilege role.</div></div>
   </div>
 
   <div class="foot">
