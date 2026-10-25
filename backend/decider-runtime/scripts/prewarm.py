@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Confirms the decider endpoint is ready before any shopper connects: waits for it to be InService, sends one fixed
-three-question request (checking a GPU answered), then 20 timed warm requests,
+three-question request (checking a GPU answered), warms the request shapes real turns use, then 20 timed warm requests,
 and prints client p50/p95.
 
 Usage: python3 prewarm.py [--endpoint-name voiceshop-decider] [--region us-east-1] [--wait-minutes 30]
@@ -28,6 +28,23 @@ REQUEST = {
                    "criteria": {"women": None, "men": None, "unisex": None, "girls": None, "boys": None, "not_mentioned": None}},
     },
 }
+
+
+def warmup_requests() -> list[dict]:
+    """Requests shaped like real turns. The first call of each new input shape compiles GPU
+    kernels for several seconds; doing that here means the first shoppers never wait for it
+    (on 2026-10-25 the first sentences after a deploy timed out or got "busy" without it)."""
+    intent = REQUEST["questions"]["intent"]
+    details = {k: v for k, v in REQUEST["questions"].items() if k != "intent"}
+    history = "".join(f'\nEarlier sentence {i}: "show me something else for my mom, maybe in blue or green"' for i in range(40))
+    requests = []
+    for questions in ({"intent": intent}, details, REQUEST["questions"]):
+        for pad in (0, 10, 20, 40):
+            requests.append(dict(REQUEST, state=REQUEST["state"] + history[: pad * 75], questions=questions))
+    for n in (12, 50):   # pointing at a card on a shelf of 12; best fit among up to 50 results
+        criteria = {f"item_{i:02d}": f"Item {i} | Brand {i % 7} | Color {i % 5} | ${10 + i}" for i in range(n)}
+        requests.append(dict(REQUEST, questions={"pick": {"type": "choice", "instructions": "Which item fits best?", "criteria": criteria}}))
+    return requests
 
 
 def main() -> int:
@@ -76,6 +93,21 @@ def main() -> int:
         return 1
     answers = {q: a.get("choice") for q, a in body.get("answers", {}).items()}
     print(f"✅ first request {first_ms:.0f} ms on {body['gpu']}: {answers}")
+
+    def invoke_payload(payload):
+        for attempt in range(10):
+            try:
+                return runtime.invoke_endpoint(EndpointName=args.endpoint_name, ContentType="application/json",
+                                               Accept="application/json", Body=json.dumps(payload).encode())
+            except ClientError as exc:
+                if exc.response.get("OriginalStatusCode") != 503 or attempt == 9:
+                    raise
+                time.sleep(5)
+
+    started = time.perf_counter()
+    for payload in warmup_requests():
+        invoke_payload(payload)
+    print(f"✅ warmed {len(warmup_requests())} request shapes in {time.perf_counter() - started:.0f} s")
 
     timings = sorted(invoke()[0] for _ in range(20))
     p50, p95 = statistics.median(timings), timings[int(len(timings) * 0.95) - 1]
