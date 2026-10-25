@@ -334,23 +334,48 @@ def test_shutdown_lets_a_cart_write_finish():
     assert tools.cart['itemCount'] == 1 and p.state.cart['itemCount'] == 1
 
 
-
-
-def test_an_unconfirmed_add_is_offered_again_with_the_same_key():
-    """The add may have committed: the store asks again, and the yes retries with the same key,
-    so the item is added once. Any other offer gets a new key."""
+def test_a_retry_after_a_lost_answer_never_adds_twice():
+    """The add commits but its answer is lost; whatever is said in between, a later add of the same
+    item finds the cart already moved on and adds nothing (compare-and-set in the cart tool)."""
     async def go():
         p, tools, _, _ = make(MOM, tools=SlowAddTools())
         await p.on_final('a gift for my mom')
         x = CATALOG[0]['asin']
-        first = await p._add(p.state.turn_seq, x, f'add_to_cart:{x}')
-        offer = p.state.pending_offer
-        p.state.pending_offer = None   # the confirm path pops the offer before carrying it out
-        second = await p._add(p.state.turn_seq, x, offer)
-        third = await p._add(p.state.turn_seq, CATALOG[1]['asin'], f"add_to_cart:{CATALOG[1]['asin']}")
-        return first, offer, second, third, tools
-    first, offer, second, third, tools = run(go())
-    keys = [a['idempotencyKey'] for kind, a in tools.calls if kind == 'add']
-    assert first['confirmation'] and offer == f"add_to_cart:{CATALOG[0]['asin']}"
-    assert second['directive'] == 'act' and keys[0] == keys[1] and keys[2] != keys[0]
+        first = await p._add(p.state.turn_seq, x, f'add_to_cart:{x}')       # committed, answer lost
+        p.state.pending_offer = None                                         # "did it get added?" in between
+        second = await p._add(p.state.turn_seq, x, f'add_to_cart:{x}')      # "yes add it"
+        return first, second, tools
+    first, second, tools = run(go())
+    assert first['confirmation'] and 'try again' in first['say']
+    assert 'already in your cart (1)' in second['say']
     assert tools.cart['items'][0]['quantity'] == 1
+
+
+def test_the_retry_is_safe_after_a_reconnect():
+    """Nothing is remembered in memory: a new pipeline on the saved state (a reconnect) is just as safe."""
+    async def go():
+        p, tools, _, _ = make(MOM, tools=SlowAddTools())
+        await p.on_final('a gift for my mom')
+        x = CATALOG[0]['asin']
+        await p._add(p.state.turn_seq, x, f'add_to_cart:{x}')
+        q, *_ = make(MOM, tools=tools)
+        q.state = p.state                                                    # the restored session
+        await q._add(q.state.turn_seq, x, f'add_to_cart:{x}')
+        return tools
+    assert run(go()).cart['items'][0]['quantity'] == 1
+
+
+def test_add_another_one_still_adds():
+    async def go():
+        p, tools, _, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        x = CATALOG[0]['asin']
+        await p._add(p.state.turn_seq, x, f'add_to_cart:{x}')
+        await p._add(p.state.turn_seq, x, f'add_more:{x}')
+        return tools
+    assert run(go()).cart['items'][0]['quantity'] == 2
+
+
+def test_huge_amounts_never_overflow():
+    import filters
+    assert filters.parse_budget('under 1' + '0' * 306).max_cents == filters.MAX_PRICE_CENTS

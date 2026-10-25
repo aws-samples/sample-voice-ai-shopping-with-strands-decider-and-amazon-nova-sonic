@@ -256,10 +256,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 # The session ends here, in one order: no new input (the Sonic stream), then the
                 # turns (a cart write in progress finishes), all before the Gateway connection
                 # closes with this block; the state is saved last, below.
-                if bridge:
-                    await bridge.stop()
-                    bridge = None
-                await pipeline.shutdown()
+                try:
+                    if bridge:
+                        await bridge.stop()
+                        bridge = None
+                finally:
+                    await pipeline.shutdown()
     except WebSocketDisconnect:
         logger.info('ℹ️ session %s disconnected', session_id[:8])
     except Exception:  # noqa: BLE001

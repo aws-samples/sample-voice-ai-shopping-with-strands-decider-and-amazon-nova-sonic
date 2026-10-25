@@ -49,16 +49,16 @@ export const TOOLS: Tool[] = [
     targetName: 'add-to-cart',
     definition: {
       name: 'add_to_cart',
-      description: 'Add a product to the session cart (idempotent per idempotencyKey). Returns the updated cart with integer totals.',
+      description: 'Add one of a product to the session cart, compare-and-set: the line becomes expectedQuantity + 1 only if '
+        + 'the cart holds expectedQuantity of it; otherwise nothing changes and conflict is true. Returns the cart with integer totals.',
       inputSchema: {
         type: T.OBJECT,
         properties: {
           sessionId: SESSION_ID,
           asin: ASIN,
-          quantity: { type: T.INTEGER, description: 'Quantity to add, 1-10 (default 1).' },
-          idempotencyKey: IDEMPOTENCY_KEY,
+          expectedQuantity: { type: T.INTEGER, description: 'How many of the product the caller believes the cart holds, 0-9 (default 0).' },
         },
-        required: ['sessionId', 'asin', 'idempotencyKey'],
+        required: ['sessionId', 'asin'],
       },
     },
   },

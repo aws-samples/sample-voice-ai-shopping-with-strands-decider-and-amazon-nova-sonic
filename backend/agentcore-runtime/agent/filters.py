@@ -68,7 +68,7 @@ def _to_cents(amount: str) -> int | None:
         value = float(number)
     if not (value > 0 and math.isfinite(value)):
         return None
-    return min(round(value * 100), MAX_PRICE_CENTS)
+    return MAX_PRICE_CENTS if value * 100 >= MAX_PRICE_CENTS else round(value * 100)
 
 
 @dataclass(frozen=True)

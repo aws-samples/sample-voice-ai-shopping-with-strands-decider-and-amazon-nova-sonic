@@ -70,15 +70,16 @@ async def run(args) -> None:
             r = payload(await call('get_product_detail', {'asin': 'not-an-asin'}))
             check('get_product_detail invalid asin -> ValidationError', r.get('error') == 'ValidationError', r.get('message', ''))
 
-            # add_to_cart (idempotent) and place_order, on a throwaway session id
+            # add_to_cart (compare-and-set) and place_order, on a throwaway session id
             session_id = f'gateway-check-{uuid.uuid4()}'
-            key = f'add-{uuid.uuid4().hex[:12]}'
-            first = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'quantity': 2, 'idempotencyKey': key}))
-            again = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'quantity': 2, 'idempotencyKey': key}))
-            check('add_to_cart valid', first.get('cart', {}).get('itemCount') == 2, json.dumps(first.get('cart', {}))[:120])
-            check('add_to_cart retry is idempotent', again.get('cart', {}).get('itemCount') == 2)
-            r = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'quantity': 99, 'idempotencyKey': 'x'}))
-            check('add_to_cart quantity 99 -> ValidationError', r.get('error') == 'ValidationError', r.get('message', ''))
+            first = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'expectedQuantity': 0}))
+            again = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'expectedQuantity': 0}))
+            second = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'expectedQuantity': 1}))
+            check('add_to_cart valid', first.get('cart', {}).get('itemCount') == 1, json.dumps(first.get('cart', {}))[:120])
+            check('add_to_cart retry changes nothing', again.get('conflict') is True and again.get('cart', {}).get('itemCount') == 1)
+            check('add_to_cart another one', second.get('cart', {}).get('itemCount') == 2)
+            r = payload(await call('add_to_cart', {'sessionId': session_id, 'asin': asin, 'expectedQuantity': 99}))
+            check('add_to_cart expectedQuantity 99 -> ValidationError', r.get('error') == 'ValidationError', r.get('message', ''))
             order_key = f'order-{uuid.uuid4().hex[:12]}'
             order = payload(await call('place_order', {'sessionId': session_id, 'idempotencyKey': order_key}))
             check('place_order valid', order.get('order', {}).get('itemCount') == 2, json.dumps(order.get('order', {}))[:120])

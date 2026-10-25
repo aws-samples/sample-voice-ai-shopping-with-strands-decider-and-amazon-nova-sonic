@@ -179,10 +179,8 @@ export class LambdaStack extends cdk.Stack {
       CART_TABLE_NAME: props.cartTable.tableName,
     });
     this.addToCart.addToRolePolicy(new iam.PolicyStatement({ actions: ['dynamodb:GetItem'], resources: [props.productsTable.tableArn] }));
-    // UpdateItem (conditional ADD) instead of the design table's GetItem+PutItem:
-    // one atomic, idempotent write per call.
-    // UpdateItem for the cart line, PutItem for the per-request idempotency record (one transaction).
-    this.addToCart.addToRolePolicy(new iam.PolicyStatement({ actions: ['dynamodb:UpdateItem', 'dynamodb:PutItem', 'dynamodb:Query'], resources: [props.cartTable.tableArn] }));
+    // One conditional UpdateItem per call (compare-and-set on the line's quantity); Query reads the cart back.
+    this.addToCart.addToRolePolicy(new iam.PolicyStatement({ actions: ['dynamodb:UpdateItem', 'dynamodb:Query'], resources: [props.cartTable.tableArn] }));
 
     // ---- remove_from_cart -------------------------------------------------
     this.removeFromCart = makeFunction('RemoveFromCart', 'remove_from_cart tool: deletes one cart line in VoiceShop-Cart.', {

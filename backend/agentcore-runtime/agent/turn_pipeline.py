@@ -51,9 +51,8 @@ def _cart_serialized(method):
 
 
 def request_key(session_id: str) -> str:
-    """An idempotency key for one confirmed cart or order action. Random, not the turn number: the
-    turn counter restarts from the last saved state after a reconnect, and a reused key would make
-    a new add or order a silent no-op reported as done."""
+    """An idempotency key for one order attempt (the SDK call and its one retry share it). Random,
+    not the turn number: the turn counter restarts from the last saved state after a reconnect."""
     return f'{session_id}:{uuid.uuid4().hex}'
 SPECULATIVE_DEBOUNCE_S = 0.25
 # How long get_turn_outcome waits for the turn before Sonic says "One moment.". The
@@ -110,9 +109,6 @@ class TurnPipeline:
         # instead of cancelling it: on 2026-10-21 a "yes" that had already added the jeans
         # was cancelled before it closed the product, and the next sentence added them again.
         self._committing: asyncio.Task | None = None
-        # The idempotency key of the pending cart or order offer: an offer re-made after a write
-        # that failed or timed out keeps its key, so a repeated yes cannot write twice.
-        self._offer_key: tuple[str, str] | None = None   # (offer, key)
         self._round_answers: dict = {}
         self._background: set[asyncio.Task] = set()   # fire-and-forget work, kept referenced
         self._retrieval_filters: dict = {}
@@ -297,15 +293,13 @@ class TurnPipeline:
         except Exception:  # noqa: BLE001 -- one bad turn must not end the session
             logger.error('❌ turn failed', exc_info=True)
             result = {'directive': 'ask', 'say': 'Sorry, something went wrong. Could you say that again?',
-                      'cart': cart_summary(self.state.cart)}
+                      'speak': True, 'cart': cart_summary(self.state.cart)}   # a question to the shopper: spoken
             await self.deps.send(ui_events.status('error', 'Something went wrong with that request.'))
         if not outcome.done():
             outcome.set_result(result)
 
     async def _turn(self, text: str) -> dict:
         state, deps = self.state, self.deps
-        if self._offer_key and state.pending_offer != self._offer_key[0]:
-            self._offer_key = None   # the offer it was kept for has been replaced or dropped
         self._t0 = time.perf_counter()
         ms = self._elapsed_ms
         state.turn_seq += 1
@@ -407,8 +401,9 @@ class TurnPipeline:
             # over. _fresh_details asks this sentence again for the rest.
             policy.reset_for_new_person(state)
             state.transcripts = state.transcripts[-1:]   # the earlier sentences were about the previous person
+            # The new person's chip, the chips it implies, and amounts stated in this sentence.
             plan.commits = {k: v for k, v in plan.commits.items()
-                            if k == 'recipient' or (k == 'gender' and v.source == 'recipient') or (k == 'budget' and v.source == 'stated')}
+                            if k == 'recipient' or v.source in ('recipient', 'stated')}
             plan.context = {}
         policy.apply_commits(state, plan, parsed_budget)
         if new_person:
@@ -745,38 +740,39 @@ class TurnPipeline:
                            'Should I add another one?'}
         return await self._add(turn, asin, offer if offer and offer.startswith(('add_to_cart:', 'add_more:')) else f'add_to_cart:{asin}')
 
-    def _key_for(self, offer: str) -> str:
-        """The idempotency key for carrying out this offer: the one it was made with if it is being
-        retried after an unconfirmed write, otherwise a new one."""
-        retry, self._offer_key = self._offer_key, None
-        return retry[1] if retry and retry[0] == offer else request_key(self.state.session_id)
-
-    def _offer_again(self, offer: str, key: str, say: str) -> dict:
-        """The write may or may not have happened: ask again, and a yes retries with the same key,
-        so it completes the write at most once."""
-        self.state.pending_offer, self._offer_key = offer, (offer, key)
+    def _offer_again(self, offer: str, say: str) -> dict:
+        """A write that may or may not have happened: ask again. Retrying is safe, because the
+        cart tools say what they expect (an add is compare-and-set, an order checks for itself)."""
+        self.state.pending_offer = offer
         return {'directive': 'ask', 'confirmation': True, 'say': say}
 
     @_cart_serialized
     async def _add(self, turn: int, asin: str, offer: str) -> dict:
         state, deps = self.state, self.deps
-        key = self._key_for(offer)
+        seen = next((int(i['quantity']) for i in state.cart.get('items', []) if i['asin'] == asin), 0)
         try:
             started = time.perf_counter()
-            result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'quantity': 1,
-                                                   'idempotencyKey': key})
+            result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'expectedQuantity': seen})
             cart = result.get('cart') or {}
-            await self._activity('dynamodb', 'Added to the cart: one DynamoDB transaction on VoiceShop-Cart',
+            await self._activity('dynamodb', 'Added to the cart: one conditional DynamoDB write on VoiceShop-Cart',
                                  f"1 × {next((p['title'] for p in state.shelf if p['asin'] == asin), asin)[:60]} · cart now "
                                  f"{cart.get('itemCount', '?')} item(s), {ui_events.format_cents(cart.get('totalCents', 0))} · "
-                                 'a retry with the same request key changes nothing', (time.perf_counter() - started) * 1000)
+                                 f"only if the cart still holds {seen} of it, so a retry never adds twice",
+                                 (time.perf_counter() - started) * 1000)
         except Exception:  # noqa: BLE001
             logger.error('❌ add_to_cart failed', exc_info=True)
-            return self._offer_again(offer, key, "I couldn't confirm that it was added. Should I try again?")
+            return self._offer_again(offer, "I couldn't confirm that it was added. Should I try again?")
         if 'cart' not in result:
             return {'directive': 'error', 'say': "I couldn't add that to the cart."}
         state.cart = result['cart']
         await deps.send(ui_events.cart(state.cart))
+        now = next((int(i['quantity']) for i in state.cart.get('items', []) if i['asin'] == asin), 0)
+        if result.get('conflict'):
+            # The cart was not as this session last saw it: an earlier add that did go through (its
+            # answer was lost), or another tab. Nothing was added; say what the cart holds.
+            if now > seen:
+                return {'directive': 'act', 'say': f"That is already in your cart ({now}). {cart_summary(state.cart)}"}
+            return self._offer_again(offer, f"Your cart changed. {cart_summary(state.cart)} Should I add it now?")
         if state.open_product and state.open_product.get('asin') == asin:
             state.open_product = None   # added: back to the shelf
             await deps.send(ui_events.product_close(turn))
@@ -790,8 +786,7 @@ class TurnPipeline:
         state, deps = self.state, self.deps
         if not state.cart.get('itemCount'):
             return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
-        key = self._key_for('place_order')
-        request = {'sessionId': state.session_id, 'idempotencyKey': key}
+        request = {'sessionId': state.session_id, 'idempotencyKey': request_key(state.session_id)}
         result = None
         for attempt in range(2):   # the same key: a retry returns the order instead of placing a second one
             try:
@@ -806,11 +801,14 @@ class TurnPipeline:
             except Exception:  # noqa: BLE001
                 logger.error('❌ place_order failed (attempt %d)', attempt + 1, exc_info=True)
         if result is None:
-            return self._offer_again('place_order', key, "I couldn't confirm the order. Should I try again?")
+            return self._offer_again('place_order', "I couldn't confirm the order. Should I try again?")
         if result.get('error') == 'EmptyCart':
+            # This session saw items, but the store's cart is empty: an earlier order did go through.
+            say = 'The cart is already empty, so your earlier order went through.' if state.cart.get('itemCount') \
+                else 'The cart is empty, so there is nothing to order yet.'
             state.cart = {'items': [], 'itemCount': 0, 'totalCents': 0}
             await deps.send(ui_events.cart(state.cart))
-            return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
+            return {'directive': 'act', 'say': say}
         order = result.get('order')
         if not order:
             logger.error('❌ place_order returned %s', result.get('error'))

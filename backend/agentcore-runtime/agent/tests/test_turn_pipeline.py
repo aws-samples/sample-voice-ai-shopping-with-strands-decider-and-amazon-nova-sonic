@@ -50,18 +50,19 @@ class FakeTools:
                      'totalCents': sum(i['priceCents'] * i['quantity'] for i in items)}
 
     async def add_to_cart(self, args):
+        """Compare-and-set, like the Lambda: one more only if the cart holds expectedQuantity."""
         self.calls.append(('add', args))
         await asyncio.sleep(self.add_delay)
-        if args['idempotencyKey'] not in self.keys:
-            self.keys.add(args['idempotencyKey'])
+        items = [dict(i) for i in self.cart['items']]
+        line = next((i for i in items if i['asin'] == args['asin']), None)
+        if (line['quantity'] if line else 0) != args.get('expectedQuantity', 0):
+            return {'cart': self.cart, 'conflict': True}
+        if line:
+            line['quantity'] += 1
+        else:
             product = next(p for p in CATALOG if p['asin'] == args['asin'])
-            items = [dict(i) for i in self.cart['items']]
-            line = next((i for i in items if i['asin'] == args['asin']), None)
-            if line:
-                line['quantity'] += 1
-            else:
-                items.append({'asin': args['asin'], 'title': product['title'], 'quantity': 1, 'priceCents': product['priceCents']})
-            self._set(items)
+            items.append({'asin': args['asin'], 'title': product['title'], 'quantity': 1, 'priceCents': product['priceCents']})
+        self._set(items)
         return {'cart': self.cart}
 
     async def remove_from_cart(self, args):
@@ -292,7 +293,7 @@ def test_confirm_adds_with_idempotency_key_then_place_order_gating():
         return p, tools, sent, added, unsure, placed, again
     p, tools, sent, added, unsure, placed, again = run(go())
     add_calls = [a for kind, a in tools.calls if kind == 'add']
-    assert add_calls and add_calls[0]['idempotencyKey'].startswith(f'{p.state.session_id}:')
+    assert add_calls and add_calls[0]['expectedQuantity'] == 0
     assert 'Added to the cart' in added['say']
     # An order is always offered first and placed on yes; never for an empty cart.
     assert unsure['say'] == 'Should I place the order?' and unsure['speak'] is True   # spoken confirmation
