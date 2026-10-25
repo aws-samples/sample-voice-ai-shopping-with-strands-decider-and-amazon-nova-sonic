@@ -13,6 +13,8 @@ import type { BrowserMessage, ConnectionState, HostMessage, SessionTransport } f
 
 const MAX_RECONNECTS = 5;
 const AUTH_FAILED_CLOSE_CODE = 4401;
+// Too many open sessions for this account (session host): retrying would only be refused again.
+const TOO_MANY_SESSIONS_CLOSE_CODE = 4429;
 
 /** UUID v4 plus a timestamp suffix: at least 33 characters, as AgentCore requires. */
 export function newRuntimeSessionId(): string {
@@ -73,6 +75,7 @@ export class AgentCoreTransport implements SessionTransport {
       if (this.ws !== ws) return;   // an older socket closing late must not touch the new one
       this.ws = null;
       const retry = !this.closedByUser && event.code !== 1000 && event.code !== AUTH_FAILED_CLOSE_CODE
+        && event.code !== TOO_MANY_SESSIONS_CLOSE_CODE
         && this.reconnects < MAX_RECONNECTS;
       if (event.code === AUTH_FAILED_CLOSE_CODE) {
         this.messageHandler({ type: 'error', message: 'Your sign-in could not be verified. Please sign in again.' });

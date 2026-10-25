@@ -113,3 +113,10 @@ def test_a_busy_decider_is_not_retried():
     with pytest.raises(decider_client.DeciderUnavailable):
         run(decider_client.ask('s', {'q': {'type': 'noul', 'instructions': 'x'}}, endpoint_name='e', client=BusyRuntime()))
     assert len(calls) == 1
+
+
+def test_the_decider_client_makes_one_attempt_only(monkeypatch):
+    """botocore's max_attempts counts retries; a hidden retry after a 3 s timeout would queue the
+    same call again behind a busy decider."""
+    monkeypatch.setattr(decider_client, '_client', None)
+    assert decider_client._sagemaker_runtime().meta.config.retries['total_max_attempts'] == 1

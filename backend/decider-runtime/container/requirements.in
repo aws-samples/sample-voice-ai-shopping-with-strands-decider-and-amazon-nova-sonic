@@ -9,3 +9,4 @@ uvicorn[standard]==0.54.0
 # Build tools for the strands-decider checkout (installed without build isolation).
 setuptools>=68
 wheel
+pip==26.2.2   # the installer itself, so it is hash-checked too

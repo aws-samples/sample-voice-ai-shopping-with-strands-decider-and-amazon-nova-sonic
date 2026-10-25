@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 _BOTO_CONFIG = Config(
     connect_timeout=5,
     read_timeout=10,
-    retries={"max_attempts": 1, "mode": "standard"},
+    retries={"total_max_attempts": 1, "mode": "standard"},
 )
 
 

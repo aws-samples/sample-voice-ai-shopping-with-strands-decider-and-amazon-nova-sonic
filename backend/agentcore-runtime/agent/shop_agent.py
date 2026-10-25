@@ -179,6 +179,12 @@ async def websocket_endpoint(websocket: WebSocket):
         if not await state_store.save(state):
             session_id = str(uuid.uuid4())
             state = SessionState(session_id=session_id, actor_id=user['sub'])
+    if not await state_store.claim_connection(user['sub'], session_id):
+        logger.warning('⚠️ actor %s is over the connection limit; closing', user['sub'][:8])
+        await send(ui_events.status('error', 'Too many open sessions for this account. Close another tab and try again.'))
+        await websocket.close(code=4429)
+        return
+    lease = asyncio.create_task(state_store.renew_connection(user['sub'], session_id))
     logger.info('🚀 session %s for actor %s', session_id[:8], user['sub'][:8])
     restored = bool(state.turn_seq)
     memory = SessionMemory(actor_id=user['sub'], session_id=session_id)
@@ -195,62 +201,66 @@ async def websocket_endpoint(websocket: WebSocket):
                                                 on_commit=memory.on_commit, on_liked=memory.on_liked,
                                                 on_turn_end=on_turn_end,
                                                 user_turn_allowed=state_store.user_turn_allowed))
-            if restored:
-                await send(ui_events.chips(state.turn_seq, policy.chips(state), state.remembered))
-                await send(ui_events.shelf(state.turn_seq, state.shelf, policy.is_tentative(state), meta.total,
-                                           len(state.shelf), len(state.shelf)))
-                await send(ui_events.cart(state.cart))
-            else:
-                await pipeline.initial_shelf()
-
-            bridge = SonicBridge(pipeline, send, tools,
-                                 remembered=remembered)
             try:
-                await bridge.start()
-                await send(ui_events.status('listening', 'Tell me what you are shopping for.'))
-            except Exception:  # noqa: BLE001 -- typed input still works without voice
-                logger.error('❌ Sonic stream could not open', exc_info=True)
-                bridge = None
-                await send(ui_events.status('error', 'Voice is unavailable right now. You can still type.'))
-
-            invalid = 0
-            buckets: dict = {}
-            while True:
-                try:
-                    message = json.loads(await websocket.receive_text())
-                except ValueError:
-                    message = None
-                if not valid(message, state) or not limiter_for(buckets, message['type']).take():
-                    invalid += 1
-                    logger.warning('⚠️ invalid browser message (%s of %s)', invalid, MAX_INVALID_MESSAGES)
-                    if invalid >= MAX_INVALID_MESSAGES:
-                        await websocket.close(code=1008)
-                        return
-                    continue
-                kind = message['type']
-                if kind == 'bidi_audio_input' and bridge:
-                    await bridge.audio(message['audio'])
-                elif kind == 'bidi_text_input':
-                    if bridge:
-                        await bridge.text(message['text'])
-                    else:
-                        await send({'type': 'bidi_transcript_stream', 'role': 'user', 'text': message['text'], 'is_final': True})
-                        pipeline.on_final(message['text'])
-                elif kind == 'ui.layout':
-                    state.columns = positions.clamp_columns(message['columns'])
-                elif kind == 'ui.chip_remove':
-                    state.push_history()
-                    policy.reopen(state, message['slot'])
+                if restored:
                     await send(ui_events.chips(state.turn_seq, policy.chips(state), state.remembered))
-                elif kind == 'ui.product_tap':
-                    await pipeline.open_tapped(message['asin'])
-                elif kind == 'ui.cart_remove':
-                    await pipeline.remove_tapped(message['asin'])
-                elif kind == 'ui.close_product':
-                    state.open_product = None
-                    state.pending_offer = None
-                elif kind == 'ui.voice_replies':
-                    pipeline.voice_replies = message['enabled']
+                    await send(ui_events.shelf(state.turn_seq, state.shelf, policy.is_tentative(state), meta.total,
+                                               len(state.shelf), len(state.shelf)))
+                    await send(ui_events.cart(state.cart))
+                else:
+                    await pipeline.initial_shelf()
+
+                bridge = SonicBridge(pipeline, send, tools,
+                                     remembered=remembered)
+                try:
+                    await bridge.start()
+                    await send(ui_events.status('listening', 'Tell me what you are shopping for.'))
+                except Exception:  # noqa: BLE001 -- typed input still works without voice
+                    logger.error('❌ Sonic stream could not open', exc_info=True)
+                    bridge = None
+                    await send(ui_events.status('error', 'Voice is unavailable right now. You can still type.'))
+
+                invalid = 0
+                buckets: dict = {}
+                while True:
+                    try:
+                        message = json.loads(await websocket.receive_text())
+                    except ValueError:
+                        message = None
+                    if not valid(message, state) or not limiter_for(buckets, message['type']).take():
+                        invalid += 1
+                        logger.warning('⚠️ invalid browser message (%s of %s)', invalid, MAX_INVALID_MESSAGES)
+                        if invalid >= MAX_INVALID_MESSAGES:
+                            await websocket.close(code=1008)
+                            return
+                        continue
+                    kind = message['type']
+                    if kind == 'bidi_audio_input' and bridge:
+                        await bridge.audio(message['audio'])
+                    elif kind == 'bidi_text_input':
+                        if bridge:
+                            await bridge.text(message['text'])
+                        else:
+                            await send({'type': 'bidi_transcript_stream', 'role': 'user', 'text': message['text'], 'is_final': True})
+                            pipeline.on_final(message['text'])
+                    elif kind == 'ui.layout':
+                        state.columns = positions.clamp_columns(message['columns'])
+                    elif kind == 'ui.chip_remove':
+                        state.push_history()
+                        policy.reopen(state, message['slot'])
+                        await send(ui_events.chips(state.turn_seq, policy.chips(state), state.remembered))
+                    elif kind == 'ui.product_tap':
+                        await pipeline.open_tapped(message['asin'])
+                    elif kind == 'ui.cart_remove':
+                        await pipeline.remove_tapped(message['asin'])
+                    elif kind == 'ui.close_product':
+                        state.open_product = None
+                        state.pending_offer = None
+                    elif kind == 'ui.voice_replies':
+                        pipeline.voice_replies = message['enabled']
+            finally:
+                # The Gateway connection closes when this block ends: finish cart writes first.
+                await pipeline.shutdown()
     except WebSocketDisconnect:
         logger.info('ℹ️ session %s disconnected', session_id[:8])
     except Exception:  # noqa: BLE001
@@ -261,13 +271,13 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
     finally:
         try:
-            if 'pipeline' in locals():
-                pipeline.close()
             if bridge:
                 await bridge.stop()
         finally:
+            lease.cancel()
             # Also when the endpoint itself is cancelled, so the last state is not lost.
             await asyncio.shield(state_store.save(state))
+            await asyncio.shield(state_store.release_connection(user['sub'], session_id))
 
 
 if __name__ == '__main__':

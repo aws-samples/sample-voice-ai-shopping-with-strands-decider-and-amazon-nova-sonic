@@ -37,13 +37,13 @@ RUN rm -rf /usr/local/cuda/compat /usr/local/cuda-*/compat \
     && ldconfig \
     && (ldconfig -p | grep -i libcuda || echo "no libcuda in the image: the host driver provides it")
 RUN command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*)
-RUN python3 --version && nvcc --version && python3 -m pip install --no-cache-dir pip==26.2.2
+RUN python3 --version && nvcc --version
 # requirements.txt is a lock file (from requirements.in): every package strands-decider[cuda], torch
 # (cu126), fastapi and uvicorn need, at one version each with its hashes. strands-decider itself is
 # installed from the checkout at the pinned commit (the same commit as in requirements.in), without
 # resolving anything further.
 COPY requirements.txt /tmp/requirements.txt
-RUN python3 -m pip install --no-cache-dir --require-hashes --no-deps \
+RUN python3 -m pip install --no-cache-dir --require-hashes --no-deps --only-binary :all: \
       --extra-index-url https://download.pytorch.org/whl/cu126 -r /tmp/requirements.txt
 RUN git clone https://github.com/strands-labs/strands-decider.git /opt/strands-decider \
     && cd /opt/strands-decider \

@@ -79,7 +79,7 @@ def main():
     session = boto3.Session(region_name=args.region)
     pages = session.client('cloudformation').get_paginator('list_exports').paginate()
     function_name = next(e['Value'] for page in pages for e in page['Exports'] if e['Name'] == FUNCTION_EXPORT)
-    client = session.client('lambda', config=Config(read_timeout=30, retries={'max_attempts': 1}))
+    client = session.client('lambda', config=Config(read_timeout=30, retries={'total_max_attempts': 1}))
 
     client_ms, body, init_ms = invoke(client, function_name, {'query': QUERIES[0], **SCENARIOS['unfiltered_limit200']})
     results = {

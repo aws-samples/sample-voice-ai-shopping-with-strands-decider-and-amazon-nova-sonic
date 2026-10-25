@@ -69,7 +69,7 @@ def main() -> int:
     # The first call compiles the GPU kernels (about 40 s); "standard" mode with one attempt means
     # no hidden retry that would queue behind it.
     runtime = boto3.client("sagemaker-runtime", region_name=args.region,
-                           config=Config(read_timeout=120, retries={"max_attempts": 1, "mode": "standard"}))
+                           config=Config(read_timeout=120, retries={"total_max_attempts": 1, "mode": "standard"}))
 
     def invoke():
         started = time.perf_counter()

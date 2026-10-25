@@ -5,8 +5,9 @@ FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.12-slim@sha25
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 COPY requirements.txt .
-# requirements.txt is a lock file: every package, transitive ones included, at one version with its hashes.
-RUN pip install pip==26.2.2 && pip install --require-hashes --no-deps -r requirements.txt
+# requirements.txt is a lock file: every package, transitive ones included (pip too), at one version
+# with its hashes. Wheels only: nothing is built from source with unchecked build tools.
+RUN pip install --require-hashes --no-deps --only-binary :all: -r requirements.txt
 COPY *.py calibration.json ./
 
 RUN useradd --create-home --uid 1000 appuser

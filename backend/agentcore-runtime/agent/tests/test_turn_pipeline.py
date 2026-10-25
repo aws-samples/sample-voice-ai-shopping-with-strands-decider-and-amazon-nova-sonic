@@ -886,8 +886,10 @@ def test_a_cart_write_is_not_cancelled_by_the_next_sentence():
     p, tools, sent, first, second = run(go())
     assert first.done() and first.result()['say'].startswith('Added to the cart')
     assert len([1 for kind, _ in tools.calls if kind == 'add']) == 1 and tools.cart['itemCount'] == 1
-    assert p.state.open_product is None and of(sent, 'ui.product_close')
-    assert second['say'] == 'Which one should I add?'
+    assert of(sent, 'ui.product_close')
+    # Nothing was open any more: the second sentence is resolved to a card and asked about
+    # (aloud) before anything is added; the jeans are not added twice.
+    assert second['speak'] and second.get('confirmation') and len([1 for kind, _ in tools.calls if kind == 'add']) == 1
 
 
 def test_adding_an_item_already_in_the_cart_asks_first():
@@ -1016,3 +1018,29 @@ def test_a_change_of_mind_still_applies_in_a_pointing_sentence():
         return p
     p = run(go())
     assert p.state.recipient and p.state.recipient.value == 'father'
+
+
+def test_add_it_with_a_card_number_opens_that_card_and_asks_aloud():
+    """'Number two looks awesome, add it' with nothing open (live session, 2026-10-25): the decider
+    read the intent as confirm; the store now resolves the card instead of asking which one."""
+    async def go():
+        p, tools, _, sent = make(MOM)
+        await p.on_final('a gift for my mom')
+        second = p.state.shelf[1]['asin']
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95), 'pointed_item': ans('pointed_item', second, 0.95)}
+        outcome = await p.on_final('number two looks awesome. add it.')
+        return p, tools, outcome, second
+    p, tools, outcome, second = run(go())
+    assert p.state.open_product and p.state.open_product['asin'] == second
+    assert outcome['speak'] and 'Should I add' in outcome['say']
+    assert not [1 for kind, _ in tools.calls if kind == 'add']   # added only after a yes
+
+
+def test_a_question_that_waits_for_an_answer_is_spoken_with_voice_off():
+    async def go():
+        p, *_ = make(MOM)
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95), '_pointed_p': 0.05}   # unsure which card
+        return await p.on_final('that one')
+    outcome = run(go())
+    assert outcome['say'].startswith('Which number do you mean') and outcome['speak']

@@ -375,3 +375,64 @@ def test_the_per_shopper_counter_counts_in_one_minute_window(monkeypatch):
     results = [asyncio.run(state_store.user_turn_allowed('shopper-1')) for _ in range(3)]
     assert results == [True, True, False]
     assert seen[0]['PK'] == 'USER#shopper-1' and seen[0]['SK'].startswith('TURNS#')
+
+
+def test_a_retry_key_is_forgotten_once_the_cart_shows_the_line():
+    async def go():
+        p, tools, _, _ = make(MOM, tools=SlowAddTools())
+        await p.on_final('a gift for my mom')
+        x, y = CATALOG[0]['asin'], CATALOG[1]['asin']
+        await p._add(p.state.turn_seq, x)     # times out, but committed
+        await p._add(p.state.turn_seq, y)     # the cart now shows x: its add did commit
+        await p._add(p.state.turn_seq, x)     # "add another one": a new add, not a replay
+        return tools
+    tools = run(go())
+    keys = [a['idempotencyKey'] for kind, a in tools.calls if kind == 'add']
+    assert keys[2] != keys[0]
+    assert next(i for i in tools.cart['items'] if i['asin'] == CATALOG[0]['asin'])['quantity'] == 2
+
+
+def test_shutdown_lets_a_cart_write_finish():
+    async def go():
+        p, tools, _, _ = make(MOM, tools=FakeTools(add_delay=0.3))
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95)}
+        p.on_final('yes')
+        await asyncio.sleep(0.05)              # the add is in flight
+        await p.shutdown()
+        return p, tools
+    p, tools = run(go())
+    assert tools.cart['itemCount'] == 1 and p.state.cart['itemCount'] == 1
+
+
+class Leases:
+    def __init__(self, open_count):
+        self.puts, self.count = [], open_count
+
+    def put_item(self, Item):
+        self.puts.append(Item)
+
+    def query(self, **_):
+        return {'Count': self.count}
+
+
+def test_a_shopper_over_the_connection_limit_is_refused(monkeypatch):
+    import state_store
+    table = Leases(open_count=state_store.MAX_CONNECTIONS_PER_USER + 1)
+    monkeypatch.setattr(state_store, '_sessions', lambda: table)
+    assert asyncio.run(state_store.claim_connection('shopper-1', 's-1')) is False
+    assert table.puts[-1]['expiresAt'] <= int(__import__('time').time())   # its own lease released
+    table.count = state_store.MAX_CONNECTIONS_PER_USER
+    assert asyncio.run(state_store.claim_connection('shopper-1', 's-2')) is True
+
+
+def test_the_connection_limit_fails_open(monkeypatch):
+    import state_store
+
+    class Broken:
+        def put_item(self, **_):
+            raise RuntimeError('DynamoDB unavailable')
+    monkeypatch.setattr(state_store, '_sessions', lambda: Broken())
+    assert asyncio.run(state_store.claim_connection('shopper-1', 's-1')) is True

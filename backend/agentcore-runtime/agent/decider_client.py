@@ -37,7 +37,7 @@ def _sagemaker_runtime():
         _client = boto3.client(
             'sagemaker-runtime',
             region_name=os.environ.get('AWS_REGION', 'us-east-1'),
-            config=Config(connect_timeout=1, read_timeout=3, retries={'max_attempts': 1, 'mode': 'standard'}),
+            config=Config(connect_timeout=1, read_timeout=3, retries={'total_max_attempts': 1, 'mode': 'standard'}),
         )
     return _client
 
