@@ -27,7 +27,6 @@ import policy
 import questions
 import ui_events
 from decider_client import DeciderError, DeciderUnavailable
-from rate_limit import TokenBucket
 from state import SessionState
 
 logger = logging.getLogger(__name__)
@@ -38,12 +37,6 @@ RETRIEVAL_LIMIT = 200
 # Shopper transcripts, the decider's answers and the replies are personal data: kept out of the
 # turn log unless switched on for debugging.
 LOG_TRANSCRIPTS = os.environ.get('LOG_TRANSCRIPTS', '').lower() == 'true'
-# Per connection: at most this many decider calls in flight (two turns' worth, so a shopper who
-# corrects themselves never waits), and new turns (typed or spoken) at 1 a second with bursts
-# of 5. A cancelled turn's calls keep their slots until the decider answers them, so a flood of
-# sentences cannot pile up work on the decider.
-DECIDER_SLOTS = 10
-TURN_RATE = (1.0, 5)
 
 
 def _cart_serialized(method):
@@ -117,11 +110,9 @@ class TurnPipeline:
         # instead of cancelling it: on 2026-10-21 a "yes" that had already added the jeans
         # was cancelled before it closed the product, and the next sentence added them again.
         self._committing: asyncio.Task | None = None
-        self._decider_slots = asyncio.Semaphore(DECIDER_SLOTS)
-        # Idempotency key of an add that failed or timed out, by ASIN: the add may have committed,
-        # so the shopper's retry reuses it and cannot add a second unit by accident.
-        self._retry_keys: dict[str, str] = {}
-        self._turns = TokenBucket(*TURN_RATE)
+        # The idempotency key of the pending cart or order offer: an offer re-made after a write
+        # that failed or timed out keeps its key, so a repeated yes cannot write twice.
+        self._offer_key: tuple[str, str] | None = None   # (offer, key)
         self._round_answers: dict = {}
         self._background: set[asyncio.Task] = set()   # fire-and-forget work, kept referenced
         self._retrieval_filters: dict = {}
@@ -159,15 +150,6 @@ class TurnPipeline:
         after it, on the state it leaves."""
         if self._spec_timer:
             self._spec_timer.cancel()
-        if not self._turns.take():
-            # Over the turn limit: this sentence is the newest outcome, so Sonic does not
-            # repeat the previous turn's reply for it.
-            logger.warning('⚠️ sentence dropped: more than %s turns a second', TURN_RATE[0])
-            self._outcome = asyncio.get_running_loop().create_future()
-            self._outcome.set_result({'directive': 'hold', 'say': 'One moment.', 'speak': False,
-                                      'cart': cart_summary(self.state.cart)})
-            self._spawn(self.deps.send(ui_events.status('degraded', 'That was too fast. Please say it again.')))
-            return self._outcome
         previous = self._turn_task
         # Any turn still writing, not only the latest one: a turn waiting behind it is
         # replaced, and the new turn waits for the write as well.
@@ -181,29 +163,17 @@ class TurnPipeline:
         self._turn_task = asyncio.create_task(self._run_turn(text, outcome, after))
         return outcome
 
-    def _forget_settled_keys(self, cart: dict) -> None:
-        """A failed add's key is reused only while it is unknown whether that add committed; once a
-        cart from the store shows the line, it did, and a later add of it is a new add."""
-        for line in cart.get('items', []):
-            self._retry_keys.pop(line['asin'], None)
-
     async def shutdown(self, wait_s: float = 6.0) -> None:
-        """Before the Gateway connection closes: stop work nobody will see, and let a turn that
-        is writing to the cart finish (bounded), so its result is saved with the session."""
-        self.close()
-        committing = self._committing
-        if committing and not committing.done():
-            await asyncio.wait({committing}, timeout=wait_s)
-
-    def close(self) -> None:
-        """The socket closed: stop work nobody will see. A turn that is writing to the cart
-        finishes, and state saves already started are left to complete."""
+        """The session is ending (input already stopped): cancel work nobody will see, and let a
+        turn that is writing to the cart finish, within wait_s, so its result is saved."""
         for task in (self._spec_timer, self._spec[1] if self._spec else None):
             if task and not task.done():
                 task.cancel()
-        turn = self._turn_task
-        if turn and not turn.done() and self._committing is not turn:
+        turn, committing = self._turn_task, self._committing
+        if turn and not turn.done() and turn is not committing:
             turn.cancel()
+        if committing and not committing.done():
+            await asyncio.wait({committing}, timeout=wait_s)
 
     async def turn_outcome(self, hold_s: float = OUTCOME_HOLD_S) -> dict:
         """What Sonic may say about the newest turn (get_turn_outcome tool)."""
@@ -276,27 +246,13 @@ class TurnPipeline:
     async def _ask(self, purpose: str, state_text: str, qs: dict) -> decider_client.DeciderResult:
         """A Strands Decider call, reported to the debug overlay with its answers."""
         try:
-            result = await self._decider_call(state_text, qs)
+            result = await self.deps.ask_decider(state_text, qs)
         except Exception:
             await self._activity('decider', f'Strands Decider 2B did not answer: {activity.PURPOSES.get(purpose, purpose)}')
             raise
         await self._activity('decider', activity.decider_title(purpose, len(qs)),
                              activity.answers_detail(result.answers, qs), result.client_ms)
         return result
-
-    async def _decider_call(self, state_text: str, qs: dict) -> decider_client.DeciderResult:
-        """One decider call in one of the session's slots. Cancelled while waiting for a slot, the
-        call is never sent; cancelled after, it is left to finish and frees its slot when it does
-        (InvokeEndpoint cannot be recalled), so the next turn waits instead of adding load."""
-        await self._decider_slots.acquire()
-        call = asyncio.ensure_future(self.deps.ask_decider(state_text, qs))
-
-        def done(task: asyncio.Future) -> None:
-            self._decider_slots.release()
-            if not task.cancelled():
-                task.exception()   # retrieved, so an abandoned call's error is not reported as unhandled
-        call.add_done_callback(done)
-        return await asyncio.shield(call)
 
     def _spawn(self, coro) -> None:
         task = asyncio.create_task(coro)
@@ -348,6 +304,8 @@ class TurnPipeline:
 
     async def _turn(self, text: str) -> dict:
         state, deps = self.state, self.deps
+        if self._offer_key and state.pending_offer != self._offer_key[0]:
+            self._offer_key = None   # the offer it was kept for has been replaced or dropped
         self._t0 = time.perf_counter()
         ms = self._elapsed_ms
         state.turn_seq += 1
@@ -431,8 +389,8 @@ class TurnPipeline:
             # and the hard filter then refused No. 3, a dress; live session, 2026-10-23). A change
             # of mind, re-checked with the latest sentence alone, still applies.
             kept = {'budget' if q == 'budget_band' else q for q in changes}
-            plan.commits = {k: v for k, v in plan.commits.items()
-                            if k in kept or (k == 'gender' and v.source == 'recipient' and 'recipient' in kept)}
+            # A chip implied by another chip (its source names that slot) follows it.
+            plan.commits = {k: v for k, v in plan.commits.items() if k in kept or v.source in kept}
         if plan.intent != 'confirm':
             state.pending_offer = None   # an offer answers only the very next sentence
         if plan.intent == 'narrowing':
@@ -497,17 +455,19 @@ class TurnPipeline:
                             for c in policy.chips(state)]
         # A clarifying question belongs to a narrowing turn and never replaces a
         # yes/no question, a no-match offer or an error.
+        clarifying = False
         if plan.clarify and plan.intent == 'narrowing' and not outcome.get('confirmation') \
                 and outcome['directive'] not in ('no_match', 'error'):
             outcome['directive'], outcome['say'] = 'ask', plan.clarify
-            if decider_down:
-                outcome['awaits_answer'] = True   # the shopper has to repeat it: say so aloud
+            clarifying = not decider_down   # an optional follow-up; "please say it again" is not
             metrics.emit('ClarifyingQuestions', 1)
             await deps.send(ui_events.status('clarifying', plan.clarify))
-        # Visual-first (ADR-23): speak when spoken replies are on, always for a yes/no
-        # confirmation (design decision 2026-10-18), and for a question that waits for the
-        # shopper's answer, such as which card they mean (owner, 2026-10-25).
-        outcome['speak'] = self.voice_replies or bool(outcome.get('confirmation')) or bool(outcome.pop('awaits_answer', False))
+        # Visual-first (ADR-23): speak when spoken replies are on, and for every question the turn
+        # waits on: yes/no confirmations (design decision 2026-10-18) and other asks, such as
+        # which card the shopper means (owner, 2026-10-25). A narrowing turn's optional follow-up
+        # question stays on screen.
+        outcome['speak'] = self.voice_replies or bool(outcome.get('confirmation')) \
+            or (outcome['directive'] == 'ask' and not clarifying)
         if outcome.get('say'):
             await deps.send(ui_events.reply(turn, outcome['say']))
         if state.pending_offer:
@@ -653,14 +613,14 @@ class TurnPipeline:
     async def _pointing(self, turn, plan, retrieval, timings, decider_down) -> dict:
         state, deps = self.state, self.deps
         if not state.shelf:
-            return {'directive': 'ask', 'awaits_answer': True, 'say': 'There is nothing on screen yet. What are you looking for?'}
+            return {'directive': 'ask', 'say': 'There is nothing on screen yet. What are you looking for?'}
         started = time.perf_counter()
         try:
             chosen = await self._ask('pointing', questions.pointing_text(state, state.transcripts[-1]),
                                             questions.pointed_item_question(state.shelf, state.columns))
         except (DeciderUnavailable, DeciderError):
             logger.warning('⚠️ pointing round failed', exc_info=True)
-            return {'directive': 'ask', 'awaits_answer': True, 'say': 'Which number do you mean? You can also tap it.'}
+            return {'directive': 'ask', 'say': 'Which number do you mean? You can also tap it.'}
         timings['chooseMs'] = round((time.perf_counter() - started) * 1000)
         self._round_answers.update(chosen.answers)
         # One policy: confident -> open it; unsure -> confirm it by its on-screen number
@@ -674,7 +634,7 @@ class TurnPipeline:
             state.pending_offer = f'open:{answer.choice}'
             return {'directive': 'ask', 'confirmation': True,
                     'say': f"Do you mean {questions.short_name(state.shelf[number - 1], number)}?"}
-        return {'directive': 'ask', 'awaits_answer': True, 'say': 'Which number do you mean? You can also tap it.'}
+        return {'directive': 'ask', 'say': 'Which number do you mean? You can also tap it.'}
 
     async def _open(self, turn: int, asin: str, pointed_probability: float | None = None) -> dict:
         state, deps = self.state, self.deps
@@ -775,7 +735,7 @@ class TurnPipeline:
                 # "Number two looks awesome, add it": nothing is open yet, so find the card the
                 # sentence points at (the pointing question), open it and ask before adding.
                 return await self._pointing(turn, plan, retrieval, timings, decider_down)
-            return {'directive': 'ask', 'awaits_answer': True, 'say': 'Which one should I add?'}
+            return {'directive': 'ask', 'say': 'Which one should I add?'}
         line = next((i for i in state.cart.get('items', []) if i['asin'] == asin), None)
         if line and offer != f'add_more:{asin}':
             # Already in the cart: another one only on an explicit yes.
@@ -783,12 +743,24 @@ class TurnPipeline:
             return {'directive': 'ask', 'confirmation': True,
                     'say': f"{line.get('title', 'That item')[:80]} is already in your cart ({line.get('quantity', 1)}). "
                            'Should I add another one?'}
-        return await self._add(turn, asin)
+        return await self._add(turn, asin, offer if offer and offer.startswith(('add_to_cart:', 'add_more:')) else f'add_to_cart:{asin}')
+
+    def _key_for(self, offer: str) -> str:
+        """The idempotency key for carrying out this offer: the one it was made with if it is being
+        retried after an unconfirmed write, otherwise a new one."""
+        retry, self._offer_key = self._offer_key, None
+        return retry[1] if retry and retry[0] == offer else request_key(self.state.session_id)
+
+    def _offer_again(self, offer: str, key: str, say: str) -> dict:
+        """The write may or may not have happened: ask again, and a yes retries with the same key,
+        so it completes the write at most once."""
+        self.state.pending_offer, self._offer_key = offer, (offer, key)
+        return {'directive': 'ask', 'confirmation': True, 'say': say}
 
     @_cart_serialized
-    async def _add(self, turn: int, asin: str) -> dict:
+    async def _add(self, turn: int, asin: str, offer: str) -> dict:
         state, deps = self.state, self.deps
-        key = self._retry_keys.pop(asin, None) or request_key(state.session_id)
+        key = self._key_for(offer)
         try:
             started = time.perf_counter()
             result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'quantity': 1,
@@ -800,12 +772,10 @@ class TurnPipeline:
                                  'a retry with the same request key changes nothing', (time.perf_counter() - started) * 1000)
         except Exception:  # noqa: BLE001
             logger.error('❌ add_to_cart failed', exc_info=True)
-            self._retry_keys[asin] = key
-            return {'directive': 'error', 'say': "I couldn't add that to the cart."}
+            return self._offer_again(offer, key, "I couldn't confirm that it was added. Should I try again?")
         if 'cart' not in result:
             return {'directive': 'error', 'say': "I couldn't add that to the cart."}
         state.cart = result['cart']
-        self._forget_settled_keys(state.cart)
         await deps.send(ui_events.cart(state.cart))
         if state.open_product and state.open_product.get('asin') == asin:
             state.open_product = None   # added: back to the shelf
@@ -820,7 +790,8 @@ class TurnPipeline:
         state, deps = self.state, self.deps
         if not state.cart.get('itemCount'):
             return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
-        request = {'sessionId': state.session_id, 'idempotencyKey': request_key(state.session_id)}
+        key = self._key_for('place_order')
+        request = {'sessionId': state.session_id, 'idempotencyKey': key}
         result = None
         for attempt in range(2):   # the same key: a retry returns the order instead of placing a second one
             try:
@@ -835,7 +806,7 @@ class TurnPipeline:
             except Exception:  # noqa: BLE001
                 logger.error('❌ place_order failed (attempt %d)', attempt + 1, exc_info=True)
         if result is None:
-            return {'directive': 'error', 'say': "I couldn't confirm the order. If the cart is now empty, it was placed."}
+            return self._offer_again('place_order', key, "I couldn't confirm the order. Should I try again?")
         if result.get('error') == 'EmptyCart':
             state.cart = {'items': [], 'itemCount': 0, 'totalCents': 0}
             await deps.send(ui_events.cart(state.cart))
@@ -846,7 +817,6 @@ class TurnPipeline:
             return {'directive': 'error', 'say': "I couldn't place the order. Please try again."}
         state.cart = {'items': [], 'itemCount': 0, 'totalCents': 0}
         state.pending_offer = None
-        self._retry_keys.clear()
         await deps.send(ui_events.order_placed(turn, order))
         await deps.send(ui_events.cart(state.cart))
         return {'directive': 'act', 'say': f"Order placed: {order['itemCount']} item{'s' if order['itemCount'] != 1 else ''}, "
@@ -915,8 +885,6 @@ class TurnPipeline:
         if 'cart' not in result:
             return {'directive': 'error', 'say': "I couldn't remove that from the cart."}
         state.cart = result['cart']
-        self._retry_keys.pop(asin, None)
-        self._forget_settled_keys(state.cart)
         await deps.send(ui_events.cart(state.cart))
         if keep:
             return {'directive': 'act', 'say': f'Removed one {title[:80]}; {keep} left. {cart_summary(state.cart)}'}

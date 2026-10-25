@@ -83,21 +83,3 @@ def test_the_shelf_keeps_the_department_field():
     from turn_pipeline import CATALOG_FIELDS
     assert 'department' in CATALOG_FIELDS
 
-
-def test_digits_with_a_scale_word():
-    from filters import parse_budget
-    assert parse_budget('under $1.5k').max_cents == 150000
-    assert parse_budget('under $2 hundred').max_cents == 20000
-    assert parse_budget('under 5 thousand dollars').max_cents == 500000
-    assert parse_budget('show me 5 kids toys') is None   # "k" only as its own word
-
-
-def test_mixed_digit_and_word_amounts_and_k_only_as_money():
-    from filters import parse_budget, MAX_PRICE_CENTS
-    assert parse_budget('under 2 hundred and fifty').max_cents == 25000
-    assert parse_budget('under 2 thousand 500').max_cents == 250000
-    assert parse_budget('under 5 hundred thousand dollars').max_cents == MAX_PRICE_CENTS
-    assert parse_budget('a monitor that goes up to 4k') is None
-    assert parse_budget('under 12k gold') is None
-    assert parse_budget('under $5k').max_cents == 500000
-    assert parse_budget('between 20 and 40 dollars').min_cents == 2000

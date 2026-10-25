@@ -35,8 +35,8 @@ export class DynamoDBStack extends cdk.Stack {
 
     // =====================================================================
     // Sessions: PK = SESSION#<runtimeSessionId>, SK = STATE | TURN#<seq> (expires 24 h after the
-    // last write), and per-shopper limits: PK = USER#<sub>, SK = TURNS#<minute> | CONN#<sessionId>
-    // (expire within 2 minutes). Written by the session host.
+    // last write), and the per-shopper turn counter: PK = USER#<sub>, SK = TURNS#<minute> (expires
+    // after 2 minutes). Written by the session host.
     // =====================================================================
     this.sessionsTable = new dynamodb.Table(this, 'SessionsTable', {
       ...tableDefaults,

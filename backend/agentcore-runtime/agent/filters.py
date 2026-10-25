@@ -21,31 +21,22 @@ _TENS = {'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60, 'sev
 _NUMBER_WORD = r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|" \
                r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|" \
                r"thousand|and|a)"
-# A spoken or written amount: "$79.99", "80", "eighty", "a hundred and fifty", "two hundred", and
-# digits mixed with scale words, as speech-to-text often writes them: "200 thousand",
-# "2 hundred and fifty", "2 thousand 500", "1.5k". A bare "k" counts only as money ("$5k",
-# "5k dollars"): "a 4k monitor" or "12k gold" are not prices.
-_SMALL_WORD = r"(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|" \
-              r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)"
-_SCALE = rf"(?:[\s-]+(?:hundred|thousand)\b(?:[\s-]+(?:and[\s-]+)?(?:\d+|{_SMALL_WORD})\b)*)*(?:\s?k\b)?"
-_AMOUNT = rf"(\$?\s?\d[\d,]*(?:\.\d{{1,2}})?{_SCALE}|(?:\b{_NUMBER_WORD}\b[\s-]?)+)"
+# A spoken or written amount: "$79.99", "80", "eighty", "a hundred and fifty", "two hundred".
+_AMOUNT = rf"(\$?\s?\d[\d,]*(?:\.\d{{1,2}})?|(?:\b{_NUMBER_WORD}\b[\s-]?)+)"
 _CURRENCY = r"(?:\s?(?:dollars?|bucks|usd))?"
 
 _MAX_WORDS = r"under|below|less than|up to|no more than|not more than|at most|maximum of|max|within|cheaper than|tops"
 _MIN_WORDS = r"over|above|more than|at least|minimum of|starting at"
 
 
-def words_to_number(text: str) -> float | None:
-    """'eighty' -> 80, 'a hundred and fifty' -> 150, 'two thousand' -> 2000, '2 thousand 500' -> 2500.
-    None if not a number."""
+def words_to_number(text: str) -> int | None:
+    """'eighty' -> 80, 'a hundred and fifty' -> 150, 'two thousand' -> 2000. None if not a number."""
     words = [w for w in re.split(r'[\s-]+', text.strip().lower()) if w and w != 'and']
     if not words or all(w == 'a' for w in words):
         return None
     total, current = 0, 0
     for word in words:
-        if re.fullmatch(r'\d[\d,]*(?:\.\d+)?', word):
-            current += float(word.replace(',', ''))
-        elif word == 'a':
+        if word == 'a':
             current = max(current, 1)
         elif word in _UNITS:
             current += _UNITS[word]
@@ -66,17 +57,10 @@ def words_to_number(text: str) -> float | None:
 MAX_PRICE_CENTS = 10_000_000
 
 
-def _to_cents(amount: str, money: bool = True) -> int | None:
+def _to_cents(amount: str) -> int | None:
     amount = amount.strip()
     if re.match(r'^\$?\s?\d', amount):
-        kilo = re.search(r'\s?k$', amount)
-        if kilo and not money:
-            return None   # "4k" or "12k" without a currency is not an amount
-        number = amount[:kilo.start()] if kilo else amount
-        value = words_to_number(number.replace('$', ' ').replace('-', ' '))
-        if value is None:
-            return None
-        value = float(value) * (1000 if kilo else 1)
+        value = float(amount.replace('$', '').replace(',', '').strip())
     else:
         number = words_to_number(amount)
         if number is None:
@@ -113,17 +97,16 @@ def parse_budget(transcript: str) -> Budget | None:
     '100 bucks', 'over two hundred'. Vague phrases ('nothing too pricey') return None;
     those go to the budget_band question instead."""
     text = transcript.lower().replace('’', "'")
-    money = lambda m: bool(re.search(r"\$|dollars?|bucks|usd", m.group(0)))  # noqa: E731
     between = re.search(rf"\bbetween {_AMOUNT}{_CURRENCY} and {_AMOUNT}{_CURRENCY}", text)
     if between:
-        low, high = _to_cents(between.group(1), money(between)), _to_cents(between.group(2), money(between))
+        low, high = _to_cents(between.group(1)), _to_cents(between.group(2))
         if low and high:
             return Budget(min_cents=min(low, high), max_cents=max(low, high))
     upper = re.search(rf"\b(?:{_MAX_WORDS})\s{_AMOUNT}{_CURRENCY}", text)
-    if upper and (cents := _to_cents(upper.group(1), money(upper))):
+    if upper and (cents := _to_cents(upper.group(1))):
         return Budget(max_cents=cents)
     lower = re.search(rf"\b(?:{_MIN_WORDS})\s{_AMOUNT}{_CURRENCY}", text)
-    if lower and (cents := _to_cents(lower.group(1), money(lower))):
+    if lower and (cents := _to_cents(lower.group(1))):
         return Budget(min_cents=cents)
     # A bare amount with a currency word or sign: "100 bucks", "$80", "eighty dollars" -> an upper bound.
     bare = re.search(rf"(\$\s?\d[\d,]*(?:\.\d{{1,2}})?)|\b({_AMOUNT})\s?(?:dollars?|bucks)\b", text)

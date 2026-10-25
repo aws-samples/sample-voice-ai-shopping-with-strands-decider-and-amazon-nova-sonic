@@ -68,8 +68,7 @@ def test_tokens_from_another_pool_or_client_are_rejected(monkeypatch):
         jwt_auth._claims('not-a-jwt')
 
 
-def test_a_deployed_host_without_the_pool_settings_rejects_tokens(monkeypatch):
-    monkeypatch.setenv('AGENTCORE_GATEWAY_URL', 'https://gateway.example')
+def test_a_host_without_the_pool_settings_rejects_tokens(monkeypatch):
     monkeypatch.delenv('USER_POOL_ID', raising=False)
     monkeypatch.delenv('USER_POOL_CLIENT_ID', raising=False)
     with pytest.raises(jwt_auth.AuthError):
@@ -106,7 +105,7 @@ def test_a_tapped_remove_waits_for_a_running_add():
         line = {'asin': CATALOG[0]['asin'], 'title': CATALOG[0]['title'], 'quantity': 1, 'priceCents': CATALOG[0]['priceCents']}
         tools.cart = {'items': [line], 'itemCount': 1, 'totalCents': line['priceCents']}
         p.state.cart = dict(tools.cart)
-        add = asyncio.create_task(p._add(p.state.turn_seq, CATALOG[1]['asin']))
+        add = asyncio.create_task(p._add(p.state.turn_seq, CATALOG[1]['asin'], f"add_to_cart:{CATALOG[1]['asin']}"))
         await asyncio.sleep(0.05)   # the add is in flight
         await p.remove_tapped(CATALOG[0]['asin'])
         await add
@@ -128,50 +127,6 @@ def test_a_malformed_audio_frame_is_dropped(monkeypatch):
     asyncio.run(bridge.audio('not base64!!'))
     asyncio.run(bridge.audio(base64.b64encode(b'\x00\x01' * 8).decode()))
     assert len(sent) == 1
-
-
-@pytest.mark.turn_limit
-def test_a_flood_of_sentences_is_dropped_beyond_the_turn_limit():
-    """Typed and spoken sentences both arrive through on_final, so both count."""
-    async def go():
-        p, _, decider, _ = make(MOM)
-        outcomes = [p.on_final(f'a gift for my mom {i}') for i in range(8)]
-        dropped = [o for o in outcomes if o.done() and o.result().get('directive') == 'hold']
-        latest = p._outcome
-        await p._turn_task
-        return dropped, latest
-    dropped, latest = run(go())
-    # The newest sentence was dropped, so Sonic gets "One moment." for it, not an older reply.
-    assert latest.result() == {'directive': 'hold', 'say': 'One moment.', 'speak': False,
-                               'cart': turn_pipeline.cart_summary({'items': [], 'itemCount': 0, 'totalCents': 0})}
-    assert len(dropped) == 8 - turn_pipeline.TURN_RATE[1]
-
-
-def test_decider_calls_of_a_cancelled_turn_keep_their_slots():
-    """A new sentence cancels the turn, but calls already sent hold their slots until they
-    return, and calls still waiting for a slot are never sent."""
-    async def go():
-        started, release = [], asyncio.Event()
-
-        async def slow_decider(state_text, qs):
-            started.append(state_text)
-            await release.wait()
-            raise turn_pipeline.DeciderUnavailable('test')
-
-        p, *_ = make(MOM)
-        p.deps.ask_decider = slow_decider
-        calls = [asyncio.create_task(p._decider_call(f's{i}', {})) for i in range(turn_pipeline.DECIDER_SLOTS + 3)]
-        await asyncio.sleep(0.01)
-        assert len(started) == turn_pipeline.DECIDER_SLOTS     # the rest wait for a slot
-        for c in calls:
-            c.cancel()
-        await asyncio.sleep(0.01)
-        assert p._decider_slots.locked()                      # the cancelled calls are still running
-        release.set()
-        await asyncio.sleep(0.01)
-        assert len(started) == turn_pipeline.DECIDER_SLOTS     # waiting calls were never sent
-        assert not p._decider_slots.locked()
-    run(go())
 
 
 def test_a_cart_tap_does_not_mark_a_turn_as_committing():
@@ -277,26 +232,13 @@ class SlowAddTools(FakeTools):
         return result
 
 
-def test_a_retried_add_after_a_timeout_reuses_its_key():
-    async def go():
-        p, tools, _, _ = make(MOM, tools=SlowAddTools())
-        await p.on_final('a gift for my mom')
-        first = await p._add(p.state.turn_seq, CATALOG[0]['asin'])
-        second = await p._add(p.state.turn_seq, CATALOG[0]['asin'])
-        return first, second, tools
-    first, second, tools = run(go())
-    keys = [a['idempotencyKey'] for kind, a in tools.calls if kind == 'add']
-    assert first['directive'] == 'error' and second['directive'] == 'act'
-    assert keys[0] == keys[1] and tools.cart['items'][0]['quantity'] == 1
-
-
 def test_closing_the_socket_stops_a_turn_that_is_not_writing():
     async def go():
         p, *_ = make(MOM, tools=FakeTools(search_delay=0.5))
         p.on_final('a gift for my mom')
         await asyncio.sleep(0.05)
         turn = p._turn_task
-        p.close()
+        await p.shutdown()
         await asyncio.sleep(0)
         return turn
     turn = run(go())
@@ -377,21 +319,6 @@ def test_the_per_shopper_counter_counts_in_one_minute_window(monkeypatch):
     assert seen[0]['PK'] == 'USER#shopper-1' and seen[0]['SK'].startswith('TURNS#')
 
 
-def test_a_retry_key_is_forgotten_once_the_cart_shows_the_line():
-    async def go():
-        p, tools, _, _ = make(MOM, tools=SlowAddTools())
-        await p.on_final('a gift for my mom')
-        x, y = CATALOG[0]['asin'], CATALOG[1]['asin']
-        await p._add(p.state.turn_seq, x)     # times out, but committed
-        await p._add(p.state.turn_seq, y)     # the cart now shows x: its add did commit
-        await p._add(p.state.turn_seq, x)     # "add another one": a new add, not a replay
-        return tools
-    tools = run(go())
-    keys = [a['idempotencyKey'] for kind, a in tools.calls if kind == 'add']
-    assert keys[2] != keys[0]
-    assert next(i for i in tools.cart['items'] if i['asin'] == CATALOG[0]['asin'])['quantity'] == 2
-
-
 def test_shutdown_lets_a_cart_write_finish():
     async def go():
         p, tools, _, _ = make(MOM, tools=FakeTools(add_delay=0.3))
@@ -407,32 +334,23 @@ def test_shutdown_lets_a_cart_write_finish():
     assert tools.cart['itemCount'] == 1 and p.state.cart['itemCount'] == 1
 
 
-class Leases:
-    def __init__(self, open_count):
-        self.puts, self.count = [], open_count
-
-    def put_item(self, Item):
-        self.puts.append(Item)
-
-    def query(self, **_):
-        return {'Count': self.count}
 
 
-def test_a_shopper_over_the_connection_limit_is_refused(monkeypatch):
-    import state_store
-    table = Leases(open_count=state_store.MAX_CONNECTIONS_PER_USER + 1)
-    monkeypatch.setattr(state_store, '_sessions', lambda: table)
-    assert asyncio.run(state_store.claim_connection('shopper-1', 's-1')) is False
-    assert table.puts[-1]['expiresAt'] <= int(__import__('time').time())   # its own lease released
-    table.count = state_store.MAX_CONNECTIONS_PER_USER
-    assert asyncio.run(state_store.claim_connection('shopper-1', 's-2')) is True
-
-
-def test_the_connection_limit_fails_open(monkeypatch):
-    import state_store
-
-    class Broken:
-        def put_item(self, **_):
-            raise RuntimeError('DynamoDB unavailable')
-    monkeypatch.setattr(state_store, '_sessions', lambda: Broken())
-    assert asyncio.run(state_store.claim_connection('shopper-1', 's-1')) is True
+def test_an_unconfirmed_add_is_offered_again_with_the_same_key():
+    """The add may have committed: the store asks again, and the yes retries with the same key,
+    so the item is added once. Any other offer gets a new key."""
+    async def go():
+        p, tools, _, _ = make(MOM, tools=SlowAddTools())
+        await p.on_final('a gift for my mom')
+        x = CATALOG[0]['asin']
+        first = await p._add(p.state.turn_seq, x, f'add_to_cart:{x}')
+        offer = p.state.pending_offer
+        p.state.pending_offer = None   # the confirm path pops the offer before carrying it out
+        second = await p._add(p.state.turn_seq, x, offer)
+        third = await p._add(p.state.turn_seq, CATALOG[1]['asin'], f"add_to_cart:{CATALOG[1]['asin']}")
+        return first, offer, second, third, tools
+    first, offer, second, third, tools = run(go())
+    keys = [a['idempotencyKey'] for kind, a in tools.calls if kind == 'add']
+    assert first['confirmation'] and offer == f"add_to_cart:{CATALOG[0]['asin']}"
+    assert second['directive'] == 'act' and keys[0] == keys[1] and keys[2] != keys[0]
+    assert tools.cart['items'][0]['quantity'] == 1

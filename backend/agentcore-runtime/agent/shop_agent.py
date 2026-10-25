@@ -179,12 +179,6 @@ async def websocket_endpoint(websocket: WebSocket):
         if not await state_store.save(state):
             session_id = str(uuid.uuid4())
             state = SessionState(session_id=session_id, actor_id=user['sub'])
-    if not await state_store.claim_connection(user['sub'], session_id):
-        logger.warning('⚠️ actor %s is over the connection limit; closing', user['sub'][:8])
-        await send(ui_events.status('error', 'Too many open sessions for this account. Close another tab and try again.'))
-        await websocket.close(code=4429)
-        return
-    lease = asyncio.create_task(state_store.renew_connection(user['sub'], session_id))
     logger.info('🚀 session %s for actor %s', session_id[:8], user['sub'][:8])
     restored = bool(state.turn_seq)
     memory = SessionMemory(actor_id=user['sub'], session_id=session_id)
@@ -259,7 +253,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     elif kind == 'ui.voice_replies':
                         pipeline.voice_replies = message['enabled']
             finally:
-                # The Gateway connection closes when this block ends: finish cart writes first.
+                # The session ends here, in one order: no new input (the Sonic stream), then the
+                # turns (a cart write in progress finishes), all before the Gateway connection
+                # closes with this block; the state is saved last, below.
+                if bridge:
+                    await bridge.stop()
+                    bridge = None
                 await pipeline.shutdown()
     except WebSocketDisconnect:
         logger.info('ℹ️ session %s disconnected', session_id[:8])
@@ -271,13 +270,11 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
     finally:
         try:
-            if bridge:
+            if bridge:   # only when the block above did not reach its own end
                 await bridge.stop()
         finally:
-            lease.cancel()
             # Also when the endpoint itself is cancelled, so the last state is not lost.
             await asyncio.shield(state_store.save(state))
-            await asyncio.shield(state_store.release_connection(user['sub'], session_id))
 
 
 if __name__ == '__main__':
