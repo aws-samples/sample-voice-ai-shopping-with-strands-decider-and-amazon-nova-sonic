@@ -55,7 +55,7 @@
 <div class="canvas">
 
   <div class="title">VoiceShop: visual-first voice shopping with Strands Decider and Amazon Nova 2.5 Sonic</div>
-  <div class="subtitle">One spoken sentence, from microphone to shelf. Strands Decider answers typed questions with calibrated confidences; code applies the hard filters and acts or asks one question. Every call between services is IAM-authenticated (SigV4); the search collection is private, reachable only through its VPC endpoint.</div>
+  <div class="subtitle">One spoken sentence, from microphone to shelf. Strands Decider answers typed questions with calibrated confidences; code applies the hard filters and acts or asks one question. Every call to the backend is IAM-authenticated (SigV4); the search collection is private, reachable only through its VPC endpoint.</div>
 
   <!-- AWS Cloud: the AWS group icon in the top-left corner -->
   <div class="boundary" style="left:200px;top:92px;width:1040px;height:786px;"></div>
@@ -80,12 +80,12 @@
 
   <div class="section" style="left:910px;top:135px;width:315px;height:210px;"><div class="section-label">Section C</div></div>
   <div class="sub" style="left:922px;top:165px;width:291px;height:168px;background:#E6F6F3;border-color:#12A08A;"><div class="sub-label">AI / ML</div></div>
-  <div class="svc" style="left:967px;top:195px;width:200px;"><img src="icons/sagemaker.svg"/><div class="n">Amazon SageMaker AI</div><div class="d">Strands Decider 2B, real-time<br/>endpoint, ml.g6.xlarge,<br/>auto-scaling, network isolation</div></div>
+  <div class="svc" style="left:967px;top:195px;width:200px;"><img src="icons/sagemaker.svg"/><div class="n">Amazon SageMaker AI</div><div class="d">Strands Decider 2B, real-time<br/>endpoint, ml.g6.xlarge,<br/>auto-scaling, network isolation,<br/>weights from Amazon S3</div></div>
 
   <!-- Row 2: B catalog, D tools, builds and operations -->
   <div class="section" style="left:220px;top:375px;width:230px;height:210px;"><div class="section-label">Section B</div></div>
   <div class="sub" style="left:232px;top:405px;width:206px;height:168px;background:#F4F5F6;border-color:#9AA3AD;"><div class="sub-label">Catalog load (deploy time)</div></div>
-  <div class="svc" style="left:236px;top:435px;"><img src="icons/s3.svg"/><div class="n">Catalog zip</div><div class="d">2,500 generated<br/>products, in the repo</div></div>
+  <div class="svc" style="left:236px;top:435px;"><img src="icons/s3.svg"/><div class="n">Catalog zip</div><div class="d">2,500 generated<br/>products: records and<br/>images, in the repo</div></div>
   <div class="svc" style="left:330px;top:435px;"><img src="icons/codebuild.svg"/><div class="n">AWS CodeBuild</div><div class="d">loads S3 and DynamoDB;<br/>index writer (VPC)<br/>fills the search index</div></div>
 
   <div class="section" style="left:470px;top:375px;width:420px;height:210px;"><div class="section-label">Section D</div></div>
@@ -105,8 +105,8 @@
     <div class="vpc-label" style="right:8px;top:7px;background:transparent;"><img src="icons/vpc.svg"/>VPC (1 AZ; 2+ in production)</div>
   </div>
   <div class="svc" style="left:264px;top:690px;width:116px;"><img src="icons/lambda.svg"/><div class="n">search_catalog,<br/>index writer</div><div class="d">Lambda functions in an<br/>isolated subnet, no<br/>internet route</div></div>
-  <div class="svc" style="left:390px;top:690px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch Serverless,<br/>Bedrock runtime,<br/>S3 (gateway)</div></div>
-  <div class="sub" style="left:555px;top:650px;width:655px;height:180px;background:#EBF8F3;border-color:#3FA77A;"><div class="sub-label">Catalog, cart and orders</div></div>
+  <div class="svc" style="left:376px;top:690px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch Serverless,<br/>Bedrock runtime,<br/>S3 (gateway)</div></div>
+  <div class="sub" style="left:555px;top:650px;width:655px;height:180px;background:#EBF8F3;border-color:#3FA77A;"><div class="sub-label">Search, catalog, cart and orders</div></div>
   <div class="svc" style="left:575px;top:690px;"><img src="icons/opensearch.svg"/><div class="n">OpenSearch Serverless</div><div class="d">vector search + hard filters;<br/>VPC endpoint only</div></div>
   <div class="svc" style="left:735px;top:690px;"><img src="icons/bedrock.svg"/><div class="n">Titan Text Embeddings V2</div><div class="d">on Amazon Bedrock</div></div>
   <div class="svc" style="left:905px;top:690px;"><img src="icons/dynamodb.svg"/><div class="n">Amazon DynamoDB</div><div class="d">Products, Sessions,<br/>Cart, Orders</div></div>
@@ -122,15 +122,15 @@
     <path d="M140 218 H254" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
     <path d="M112 193 V76 H668 V191" stroke="#232F3E" stroke-width="1.8" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
     <path d="M693 218 H786" stroke="#232F3E" stroke-width="1.6" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
-    <path d="M643 218 H569" stroke="#232F3E" stroke-width="1.3" fill="none" marker-end="url(#arr)"/>
-    <path d="M690 291 V360 H1067 V294" stroke="#232F3E" stroke-width="1.6" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <path d="M643 218 H569" stroke="#232F3E" stroke-width="1.3" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <path d="M690 291 V360 H1067 V306" stroke="#232F3E" stroke-width="1.6" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
     <path d="M668 287 V431" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
     <path d="M693 458 H761" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
     <path d="M801 524 V632 H957 V686" stroke="#232F3E" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
     <path d="M776 524 V600 H310 V686" stroke="#8C4FFF" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrv)"/>
-    <path d="M347 713 H421" stroke="#8C4FFF" stroke-width="1.6" fill="none" marker-end="url(#arrv)"/>
-    <path d="M473 713 H600" stroke="#8C4FFF" stroke-width="1.8" fill="none" marker-end="url(#arrv)"/>
-    <path d="M448 792 V814 H787 V784" stroke="#8C4FFF" stroke-width="1.6" fill="none" marker-end="url(#arrv)"/>
+    <path d="M347 713 H407" stroke="#8C4FFF" stroke-width="1.6" fill="none" marker-end="url(#arrv)"/>
+    <path d="M459 713 H600" stroke="#8C4FFF" stroke-width="1.8" fill="none" marker-end="url(#arrv)"/>
+    <path d="M434 792 V814 H787 V784" stroke="#8C4FFF" stroke-width="1.6" fill="none" marker-end="url(#arrv)"/>
     <path d="M1127 772 V862 H112 V292" stroke="#232F3E" stroke-width="1.3" stroke-dasharray="5,4" fill="none" marker-end="url(#arr)"/>
     <path d="M306 218 H364" stroke="#232F3E" stroke-width="1.4" fill="none" marker-start="url(#arr)" marker-end="url(#arr)"/>
     <path d="M311 458 H357" stroke="#7D8998" stroke-width="1.5" fill="none" marker-end="url(#arrg)"/>
@@ -145,10 +145,10 @@
   <div class="tag clear" style="left:320px;top:195px;">sign-in</div>
   <div class="tag clear" style="left:313px;top:230px;">JWT tokens</div>
   <div class="tag clear" style="left:824px;top:620px;">product detail, cart, orders</div>
-  <div class="tag" style="left:560px;top:856px;">presigned image URLs</div>
+  <div class="tag" style="left:560px;top:856px;">product images (presigned URLs)</div>
   <div class="tag clear" style="left:560px;top:816px;color:#5A2BB5;">7a: embed query (Bedrock runtime endpoint)</div>
   <div class="tag" style="left:530px;top:594px;color:#5A2BB5;">search_catalog runs here</div>
-  <div class="tag clear" style="left:476px;top:699px;color:#5A2BB5;">7b: vector search</div>
+  <div class="tag clear" style="left:462px;top:699px;color:#5A2BB5;">7b: vector search</div>
   <div class="tag clear" style="left:246px;top:540px;width:130px;text-align:right;line-height:1.3;color:#7D8998;">catalog load: invokes<br/>the index writer</div>
 
 
@@ -156,9 +156,9 @@
   <div class="step" style="left:325px;top:208px;">2</div>
   <div class="step" style="left:440px;top:66px;">3</div>
   <div class="step" style="left:729px;top:208px;">4</div>
-  <div class="step" style="left:1057px;top:318px;">5</div>
+  <div class="step" style="left:1057px;top:322px;">5</div>
   <div class="step" style="left:658px;top:350px;">6</div>
-  <div class="step" style="left:374px;top:703px;">7</div>
+  <div class="step" style="left:367px;top:703px;">7</div>
   <div class="step" style="left:791px;top:589px;">8</div>
   <div class="step" style="left:102px;top:600px;">9</div>
 
@@ -171,7 +171,7 @@
     <div class="row"><div class="b">5</div><div class="x">The turn pipeline asks <b>Strands Decider 2B</b> on an <b>Amazon SageMaker AI</b> real-time endpoint typed questions in parallel: intent, who it is for, department, category, which card, and change-of-mind re-checks. Each answer returns with a calibrated probability, and per-question thresholds decide: act, show results and ask one question, or treat it as not said.</div></div>
     <div class="row"><div class="b">6</div><div class="x">Tool calls go over MCP, with IAM authentication, through <b>Amazon Bedrock AgentCore Gateway</b> to five <b>AWS Lambda</b> functions. <b>AgentCore Memory</b> keeps the shopper&#39;s preferences for the next visit.</div></div>
     <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it (7a) embeds the shopper&#39;s query with <b>Amazon Titan Text Embeddings V2</b>, then (7b) runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>.</div></div>
-    <div class="row"><div class="b">8</div><div class="x">The product detail, cart and order tools use <b>Amazon DynamoDB</b>. Cart and order writes are idempotent transactions; an order always needs a separate yes, and no payment is taken.</div></div>
+    <div class="row"><div class="b">8</div><div class="x">The product detail, cart and order tools use <b>Amazon DynamoDB</b>. Cart and order writes are idempotent transactions; an order always needs a separate yes, and no payment is taken. The session host saves its own session state to the Sessions table directly.</div></div>
     <div class="row"><div class="b">9</div><div class="x">The screen updates first, in about a second: the shelf, and chips, small labels such as For: Mom or Under $80 that show each preference the app understood. Product images load from a private <b>Amazon S3</b> bucket through presigned URLs valid for one hour.</div></div>
     <h3 style="margin-top:12px;">Deploy and operations</h3>
     <div class="row"><div class="b dep">D</div><div class="x"><code>deploy-all.sh</code> deploys the stacks with the <b>AWS CDK</b>. <b>AWS CodeBuild</b> builds both container images into <b>Amazon ECR</b>, copies the pinned model weights to Amazon S3, and loads the generated catalog into Amazon S3, Amazon DynamoDB and the search index.</div></div>
