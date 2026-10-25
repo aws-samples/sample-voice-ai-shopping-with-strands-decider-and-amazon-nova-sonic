@@ -28,6 +28,11 @@ READONLY_HF_CACHE = os.path.join(MODEL_DIR, "hf-cache")
 # Writable by the unprivileged server user (Dockerfile USER); on SageMaker hosts /tmp is not.
 HF_CACHE = os.environ.get("DECIDER_CACHE_DIR", os.path.join(os.path.expanduser("~"), "hf-cache"))
 DECIDER_ROUTE = "/v1/systemone"
+# Back-pressure: at most this many calls wait for the GPU, and none waits longer than the
+# session host would (it gives up after 3 s). Beyond either, the call is answered 503 at once,
+# so abandoned calls never pile up work in front of other shoppers' calls.
+MAX_QUEUE = int(os.environ.get("DECIDER_MAX_QUEUE", "16"))
+MAX_WAIT_S = float(os.environ.get("DECIDER_MAX_WAIT_S", "2.5"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("decider")
@@ -84,15 +89,35 @@ class SageMakerRoutes:
         # shapes were being tuned (2026-10-21). The GPU serializes the work anyway: 4
         # concurrent calls took ~530 ms against ~490 ms one after another.
         self.lock = asyncio.Lock()
+        self.waiting = 0
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] == "http" and scope["path"] == "/invocations":
             scope = dict(scope, path=DECIDER_ROUTE, raw_path=DECIDER_ROUTE.encode())
-            send = self._with_gpu_field(send)
-            async with self.lock:
-                await self.app(scope, receive, send)
+            if self.waiting >= MAX_QUEUE:
+                await self._busy(send)
+                return
+            self.waiting += 1
+            try:
+                await asyncio.wait_for(self.lock.acquire(), timeout=MAX_WAIT_S)
+            except asyncio.TimeoutError:
+                await self._busy(send)
+                return
+            finally:
+                self.waiting -= 1
+            try:
+                await self.app(scope, receive, self._with_gpu_field(send))
+            finally:
+                self.lock.release()
             return
         await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _busy(send) -> None:
+        body = json.dumps({"error": "busy", "message": "decider queue is full; retry later"}).encode()
+        await send({"type": "http.response.start", "status": 503,
+                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+        await send({"type": "http.response.body", "body": body, "more_body": False})
 
     def _with_gpu_field(self, send):
         start = None

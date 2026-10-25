@@ -97,3 +97,19 @@ def test_a_container_error_is_retried_once():
 
     result = run(decider_client.ask('s', {'q': {'type': 'noul', 'instructions': 'x'}}, endpoint_name='e', client=FlakyRuntime()))
     assert len(calls) == 2 and result.answers['q'].noul == 0.9
+
+
+def test_a_busy_decider_is_not_retried():
+    """The container answers 503 when its queue is full; SageMaker passes it on as a ModelError."""
+    from botocore.exceptions import ClientError
+    calls = []
+
+    class BusyRuntime:
+        def invoke_endpoint(self, **kwargs):
+            calls.append(1)
+            raise ClientError({'Error': {'Code': 'ModelError', 'Message': 'busy'}, 'OriginalStatusCode': 503,
+                               'ResponseMetadata': {'HTTPStatusCode': 424}}, 'InvokeEndpoint')
+
+    with pytest.raises(decider_client.DeciderUnavailable):
+        run(decider_client.ask('s', {'q': {'type': 'noul', 'instructions': 'x'}}, endpoint_name='e', client=BusyRuntime()))
+    assert len(calls) == 1

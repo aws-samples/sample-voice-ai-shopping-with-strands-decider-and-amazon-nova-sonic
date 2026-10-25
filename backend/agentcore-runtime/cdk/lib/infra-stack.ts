@@ -101,7 +101,7 @@ export class AgentCoreInfraStack extends cdk.Stack {
     allow('Gateway', ['bedrock-agentcore:InvokeGateway'], [props.gatewayArn]);
     allow('Memory', ['bedrock-agentcore:CreateEvent', 'bedrock-agentcore:RetrieveMemoryRecords', 'bedrock-agentcore:ListEvents'],
       [this.memory.attrMemoryArn]);
-    allow('Sessions', ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:Query'],
+    allow('Sessions', ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:Query'],
       [`arn:${partition}:dynamodb:${region}:${account}:table/VoiceShop-Sessions`]);
     allow('CatalogMeta', ['dynamodb:GetItem'], [`arn:${partition}:dynamodb:${region}:${account}:table/VoiceShop-Products`]);
     allow('WorkloadIdentity', ['bedrock-agentcore:GetWorkloadAccessToken', 'bedrock-agentcore:GetWorkloadAccessTokenForJWT',

@@ -328,3 +328,50 @@ def test_a_stopped_bridge_never_publishes_a_late_stream(monkeypatch):
         return bridge
     bridge = run(go())
     assert bridge.agent is None and FakeAgent.stopped
+
+
+def test_a_shopper_over_the_per_minute_limit_gets_a_hold_on_every_connection():
+    """The limit is per shopper (actor), so a second connection does not reset it."""
+    counts = {}
+
+    async def allowed(actor_id):
+        counts[actor_id] = counts.get(actor_id, 0) + 1
+        return counts[actor_id] <= 2
+
+    async def go():
+        outcomes = []
+        for _ in range(2):   # two connections of the same shopper
+            p, tools, _, sent = make(MOM)
+            p.state.actor_id = 'shopper-1'
+            p.deps.user_turn_allowed = allowed
+            outcomes.append(await p.on_final('a gift for my mom'))
+            outcomes.append(await p.on_final('a gift for my mom'))
+        return outcomes
+    outcomes = run(go())
+    assert [o['directive'] for o in outcomes[2:]] == ['hold', 'hold']
+    assert outcomes[0]['directive'] != 'hold'
+
+
+def test_the_per_shopper_counter_fails_open(monkeypatch):
+    import state_store
+
+    class Broken:
+        def update_item(self, **_):
+            raise RuntimeError('DynamoDB unavailable')
+    monkeypatch.setattr(state_store, '_sessions', lambda: Broken())
+    assert asyncio.run(state_store.user_turn_allowed('shopper-1')) is True
+
+
+def test_the_per_shopper_counter_counts_in_one_minute_window(monkeypatch):
+    import state_store
+    seen = []
+
+    class Table:
+        def update_item(self, Key, **kwargs):
+            seen.append(Key)
+            return {'Attributes': {'turns': len(seen)}}
+    monkeypatch.setattr(state_store, '_sessions', lambda: Table())
+    monkeypatch.setattr(state_store, 'USER_TURNS_PER_MINUTE', 2)
+    results = [asyncio.run(state_store.user_turn_allowed('shopper-1')) for _ in range(3)]
+    assert results == [True, True, False]
+    assert seen[0]['PK'] == 'USER#shopper-1' and seen[0]['SK'].startswith('TURNS#')

@@ -555,9 +555,11 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
   - The Debug overlay data (decider probabilities, timings, service names) is sent to every shopper.
   - Recent turns, with their transcripts, are kept in the Sessions table for 24 hours. Transcripts stay out of the logs unless `LOG_TRANSCRIPTS=true` is set on the session host.
   - Data is encrypted with AWS managed keys (no customer managed AWS KMS keys), DynamoDB point-in-time recovery is off, every stack's resources are deleted with the stack, and `deploy-all.sh` deploys without approval prompts (`--require-approval never`).
-  - Rate limits apply per WebSocket connection, not per user.
+  - Rate limits: 1 sentence a second per connection and 60 a minute per shopper (`USER_TURNS_PER_MINUTE`); beyond a queue of 16 calls (`DECIDER_MAX_QUEUE`) the decider answers busy and the turn keeps the current results. Tune these for your traffic.
 
-  For production, turn on MFA, remove the password flow, put the Debug overlay behind a flag, review data retention, consider customer managed keys and point-in-time recovery, retain data on stack deletion, and add per-user limits.
+  For production, turn on MFA, remove the password flow, put the Debug overlay behind a flag, review data retention, consider customer managed keys and point-in-time recovery and retain data on stack deletion.
+
+- **Python dependencies are locked.** Each container's `requirements.txt` is a lock file with hashes, generated from `requirements.in` by [uv](https://docs.astral.sh/uv/); the command is in the file header. To change a dependency, edit `requirements.in` and regenerate the lock.
 
 ### Limitations
 

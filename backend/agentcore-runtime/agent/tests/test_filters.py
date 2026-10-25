@@ -82,3 +82,11 @@ def test_the_department_filter_rejects_other_and_missing_departments():
 def test_the_shelf_keeps_the_department_field():
     from turn_pipeline import CATALOG_FIELDS
     assert 'department' in CATALOG_FIELDS
+
+
+def test_digits_with_a_scale_word():
+    from filters import parse_budget
+    assert parse_budget('under 1.5k').max_cents == 150000
+    assert parse_budget('under $2 hundred').max_cents == 20000
+    assert parse_budget('under 5 thousand dollars').max_cents == 500000
+    assert parse_budget('show me 5 kids toys') is None   # "k" only as its own word

@@ -126,6 +126,8 @@ async def ask(state_text: str, questions: dict, endpoint_name: str | None = None
             status = exc.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0)
             if code != 'ModelError' and status < 500:
                 raise
+            if exc.response.get('OriginalStatusCode') == 503:
+                raise   # the decider's queue is full: a retry would only add to it
             logger.warning('⚠️ decider %s (%s); retrying once', code, status)
             return call()
 

@@ -8,11 +8,12 @@
 # One stage: the base already includes the build tools, and a second stage would
 # need the same Python at the same path.
 #
-# Installed: strands-decider[cuda] at a pinned commit, torch 2.7.1 (cu126 wheels,
-# which bundle their own CUDA runtime) and causal-conv1d. causal-conv1d's setup.py downloads
-# its prebuilt wheel from GitHub Releases without a hash check, so that wheel is installed
-# directly, pinned by sha256: a replaced release asset fails the build. The model weights are NOT in the image: SageMaker mounts them
-# read-only at /opt/ml/model from S3 before the container starts (ModelDataSource).
+# Installed: strands-decider[cuda] at a pinned commit, torch 2.7.1 (cu126 wheels, which
+# bundle their own CUDA runtime) and their dependencies from a hashed lock file, plus
+# causal-conv1d. Its setup.py would download a prebuilt wheel from GitHub Releases without a
+# hash check, so that wheel is installed directly, pinned by sha256: a replaced release asset
+# fails the build. The model weights are NOT in the image: SageMaker mounts them read-only at
+# /opt/ml/model from S3 before the container starts (ModelDataSource).
 
 # Pinned by digest as well as tag, so a rebuild cannot pick up a different base image.
 ARG BASE_IMAGE=public.ecr.aws/deep-learning-containers/base:12.9.1-gpu-py312-cu129-ubuntu22.04-ec2-v1.88@sha256:ae49e8e7ca0f30e25a8e7dfa4c484b26decfc1cd7b6b1c342c204fd5c1b20fca
@@ -37,15 +38,19 @@ RUN rm -rf /usr/local/cuda/compat /usr/local/cuda-*/compat \
     && (ldconfig -p | grep -i libcuda || echo "no libcuda in the image: the host driver provides it")
 RUN command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*)
 RUN python3 --version && nvcc --version && python3 -m pip install --no-cache-dir pip==26.2.2
+# requirements.txt is a lock file (from requirements.in): every package strands-decider[cuda], torch
+# (cu126), fastapi and uvicorn need, at one version each with its hashes. strands-decider itself is
+# installed from the checkout at the pinned commit (the same commit as in requirements.in), without
+# resolving anything further.
+COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m pip install --no-cache-dir --require-hashes --no-deps \
+      --extra-index-url https://download.pytorch.org/whl/cu126 -r /tmp/requirements.txt
 RUN git clone https://github.com/strands-labs/strands-decider.git /opt/strands-decider \
     && cd /opt/strands-decider \
     && git checkout "${STRANDS_DECIDER_COMMIT}" \
-    && python3 -m pip install --no-cache-dir ".[cuda]"
-RUN python3 -m pip install --no-cache-dir --force-reinstall torch==2.7.1 --index-url https://download.pytorch.org/whl/cu126
+    && python3 -m pip install --no-cache-dir --no-deps --no-build-isolation .
 ARG CAUSAL_CONV1D_WHEEL=https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0+cu12torch2.7cxx11abiTRUE-cp312-cp312-linux_x86_64.whl#sha256=b57df4acfae0096cdac7603cb390074df30e5ee8f35d51228a720c3c6f70d3e2
 RUN python3 -m pip install --no-cache-dir --no-deps "${CAUSAL_CONV1D_WHEEL}"
-COPY requirements.txt /tmp/requirements.txt
-RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 COPY serve.py /opt/program/serve.py
 # The server runs as an unprivileged user. It reads the model from the read-only mount at
 # /opt/ml/model and writes only under its home: the Hugging Face cache links, kernel caches and

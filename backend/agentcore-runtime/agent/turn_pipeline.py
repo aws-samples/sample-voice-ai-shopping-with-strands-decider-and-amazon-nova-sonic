@@ -95,6 +95,7 @@ class Deps:
     on_commit: Callable[[SessionState, dict], Awaitable[None]] | None = None    # memory writes
     on_liked: Callable[[SessionState, dict], Awaitable[None]] | None = None
     on_turn_end: Callable[[SessionState, dict], Awaitable[None]] | None = None  # state snapshot + turn log
+    user_turn_allowed: Callable[[str], Awaitable[bool]] | None = None     # per-shopper limit, all connections
 
 
 def normalize(text: str) -> str:
@@ -313,7 +314,12 @@ class TurnPipeline:
         try:
             if after:
                 await asyncio.wait({after})
-            result = await self._turn(text)
+            if self.deps.user_turn_allowed and not await self.deps.user_turn_allowed(self.state.actor_id):
+                logger.warning('⚠️ sentence dropped: shopper over the per-minute turn limit')
+                await self.deps.send(ui_events.status('degraded', 'Too many requests. Please wait a moment.'))
+                result = {'directive': 'hold', 'say': 'One moment.', 'speak': False, 'cart': cart_summary(self.state.cart)}
+            else:
+                result = await self._turn(text)
         except asyncio.CancelledError:
             if not outcome.done():
                 outcome.cancel()

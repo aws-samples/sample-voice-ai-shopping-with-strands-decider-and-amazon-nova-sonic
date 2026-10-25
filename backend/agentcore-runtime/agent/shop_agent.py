@@ -193,7 +193,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
             pipeline = TurnPipeline(state, Deps(tools=tools, send=send, thresholds=THRESHOLDS, catalog=meta,
                                                 on_commit=memory.on_commit, on_liked=memory.on_liked,
-                                                on_turn_end=on_turn_end))
+                                                on_turn_end=on_turn_end,
+                                                user_turn_allowed=state_store.user_turn_allowed))
             if restored:
                 await send(ui_events.chips(state.turn_seq, policy.chips(state), state.remembered))
                 await send(ui_events.shelf(state.turn_seq, state.shelf, policy.is_tentative(state), meta.total,

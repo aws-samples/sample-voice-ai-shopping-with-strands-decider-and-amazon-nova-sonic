@@ -86,6 +86,9 @@ test('runtime role is assumed by AgentCore and scoped to named resources', () =>
   expect(bySid.Gateway.Resource).toContain(':gateway/voiceshop-gateway-');
   expect(JSON.stringify(bySid.Sonic.Resource)).toContain('foundation-model/amazon.nova-2-5-sonic');
   expect(JSON.stringify(bySid.Sessions.Resource)).toContain('table/VoiceShop-Sessions');
+  // Session state and the per-shopper turn counter, on the Sessions table only.
+  expect(([] as string[]).concat(bySid.Sessions.Action).sort()).toEqual(
+    ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:Query', 'dynamodb:UpdateItem']);
   expect(([] as string[]).concat(bySid.CatalogMeta.Action)).toEqual(['dynamodb:GetItem']);
   // The session host never writes cart or orders directly: those go through the Gateway tools.
   const actions = roleStatements().flatMap((s) => ([] as string[]).concat(s.Action));

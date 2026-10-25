@@ -1,0 +1,11 @@
+# Decider container direct dependencies (x86_64, Python 3.12, CUDA). Edit this file, then regenerate the lock:
+#   uv pip compile requirements.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes \
+#     --extra-index-url https://download.pytorch.org/whl/cu126 --index-strategy unsafe-best-match --no-emit-package strands-decider -o requirements.txt
+# strands-decider itself is installed from the pinned checkout (Dockerfile) with --no-deps.
+strands-decider[cuda] @ git+https://github.com/strands-labs/strands-decider@930e6d5de16309be32579f5631a7369a3322140c
+torch==2.7.1+cu126
+fastapi==0.161.1
+uvicorn[standard]==0.54.0
+# Build tools for the strands-decider checkout (installed without build isolation).
+setuptools>=68
+wheel

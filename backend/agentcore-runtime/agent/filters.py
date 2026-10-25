@@ -21,8 +21,10 @@ _TENS = {'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60, 'sev
 _NUMBER_WORD = r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|" \
                r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|" \
                r"thousand|and|a)"
-# A spoken or written amount: "$79.99", "80", "eighty", "a hundred and fifty", "two hundred".
-_AMOUNT = rf"(\$?\s?\d[\d,]*(?:\.\d{{1,2}})?|(?:\b{_NUMBER_WORD}\b[\s-]?)+)"
+# A spoken or written amount: "$79.99", "80", "eighty", "a hundred and fifty", "two hundred", and
+# digits with a scale word, as speech-to-text often writes them: "200 thousand", "1.5k", "$2 hundred".
+_SCALE = r"(?:\s?(?:k|thousand|hundred)\b)?"
+_AMOUNT = rf"(\$?\s?\d[\d,]*(?:\.\d{{1,2}})?{_SCALE}|(?:\b{_NUMBER_WORD}\b[\s-]?)+)"
 _CURRENCY = r"(?:\s?(?:dollars?|bucks|usd))?"
 
 _MAX_WORDS = r"under|below|less than|up to|no more than|not more than|at most|maximum of|max|within|cheaper than|tops"
@@ -60,7 +62,9 @@ MAX_PRICE_CENTS = 10_000_000
 def _to_cents(amount: str) -> int | None:
     amount = amount.strip()
     if re.match(r'^\$?\s?\d', amount):
-        value = float(amount.replace('$', '').replace(',', '').strip())
+        scale = re.search(r'(k|thousand|hundred)$', amount)
+        number = re.sub(r'\s?(k|thousand|hundred)$', '', amount).replace('$', '').replace(',', '').strip()
+        value = float(number) * {'k': 1000, 'thousand': 1000, 'hundred': 100}.get(scale.group(1) if scale else '', 1)
     else:
         number = words_to_number(amount)
         if number is None:

@@ -19,6 +19,9 @@ from state import SessionState
 logger = logging.getLogger(__name__)
 
 TTL_S = 24 * 3600
+# Sentences per shopper per minute, across all of their connections (each connection also
+# has its own 1-a-second limit). Normal speech is well under this.
+USER_TURNS_PER_MINUTE = int(os.environ.get('USER_TURNS_PER_MINUTE', '60'))
 _table = None
 
 
@@ -53,6 +56,22 @@ async def load(session_id: str) -> SessionState | None:
     data = json.loads(json.dumps(item['state'], default=float))
     logger.info('💾 restored session state (turn %s)', data.get('turn_seq'))
     return SessionState.from_dict(data)
+
+
+async def user_turn_allowed(actor_id: str) -> bool:
+    """Counts one sentence for this shopper in the current minute (one atomic counter in the
+    Sessions table, expiring after two minutes). Fails open: if DynamoDB cannot answer, the
+    per-connection limits still apply and the shopper is not blocked."""
+    minute = int(time.time()) // 60
+    try:
+        response = await asyncio.to_thread(
+            _sessions().update_item, Key={'PK': f'USER#{actor_id}', 'SK': f'TURNS#{minute}'},
+            UpdateExpression='ADD turns :one SET expiresAt = :exp',
+            ExpressionAttributeValues={':one': 1, ':exp': (minute + 2) * 60}, ReturnValues='UPDATED_NEW')
+    except Exception:  # noqa: BLE001
+        logger.warning('⚠️ per-shopper turn count failed; allowing the turn', exc_info=True)
+        return True
+    return int(response['Attributes']['turns']) <= USER_TURNS_PER_MINUTE
 
 
 async def save(state: SessionState, turn: dict | None = None) -> bool:
