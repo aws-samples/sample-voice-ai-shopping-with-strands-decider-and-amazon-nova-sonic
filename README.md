@@ -4,6 +4,7 @@
 
 1. [Overview](#overview)
     - [User request flow](#user-request-flow)
+    - [The turn pipeline](#the-turn-pipeline)
     - [Cost](#cost)
     - [Sample Cost Table](#sample-cost-table)
 2. [Prerequisites](#prerequisites)
@@ -69,6 +70,19 @@ The session host (Python, FastAPI) runs the turn pipeline and the decision polic
 6. `search_catalog` runs in the VPC. It embeds the query with **Amazon Titan Text Embeddings V2** and runs a filtered vector search in **Amazon OpenSearch Serverless** through the collection's VPC endpoint. Carts and orders are **Amazon DynamoDB** transactions.
 7. The chips and the shelf update first, in about one second. Product images arrive as presigned **Amazon S3** URLs.
 8. At deploy time, `deploy-all.sh` builds both container images in **AWS CodeBuild** (no local Docker), stores them in **Amazon ECR**, creates the endpoint, and loads the catalog. **Amazon CloudWatch** collects logs, per-turn records and latency metrics. Every role is least-privilege, scoped by **AWS IAM**.
+
+### The turn pipeline
+
+The turn pipeline is the session host code (`backend/agentcore-runtime/agent/turn_pipeline.py`) that handles one sentence, spoken or typed. Code decides what happens; the models only answer questions or voice the result. For each sentence it:
+
+1. Reuses the speculative search started on the partial transcript, or starts one.
+2. Asks Strands Decider 2B its typed questions in parallel: the intent, the open details, the reply to a pending yes/no question, and change-of-mind re-checks on the chips already set.
+3. Applies the policy: per-question thresholds turn each calibrated answer into act, show results and ask one question, or treat it as not said. Exact numbers, such as a budget, are parsed in code.
+4. Routes by intent (search, point at a card, confirm, remove, place the order, go back, start over, close, scroll, show more) and calls the tools through AgentCore Gateway, with every chip as a hard filter.
+5. Updates the screen first (chips, shelf, product panel, cart), then sets the outcome that Nova 2.5 Sonic voices through its `get_turn_outcome` tool.
+6. Saves the session state and a turn record in DynamoDB.
+
+A new sentence cancels the running turn, unless that turn is already writing to the cart; then the new sentence waits for it. Cart and order writes run one at a time and are idempotent.
 
 ### Cost
 
