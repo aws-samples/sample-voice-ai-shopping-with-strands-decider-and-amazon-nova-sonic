@@ -31,6 +31,7 @@
   .svc img{width:46px;height:46px;}
   .svc .n{font-size:10px;font-weight:600;margin-top:5px;line-height:1.15;}
   .svc .d{font-size:8.4px;color:#545B64;line-height:1.2;margin-top:2px;}
+  .step.dep{background:#7D8998;}
   .step{position:absolute;width:20px;height:20px;border-radius:50%;background:#232F3E;color:#fff;font-size:10px;font-weight:bold;text-align:center;line-height:20px;z-index:6;}
   .notes{position:absolute;left:1258px;top:92px;width:300px;padding:12px 14px;font-size:10px;background:#F2F3F3;border-radius:6px;}
   .notes b{font-weight:700;}
@@ -145,9 +146,9 @@
   <div class="tag clear" style="left:313px;top:230px;">JWT tokens</div>
   <div class="tag clear" style="left:824px;top:620px;">product detail, cart, orders</div>
   <div class="tag" style="left:560px;top:856px;">presigned image URLs</div>
-  <div class="tag clear" style="left:560px;top:816px;color:#5A2BB5;">embed query (Bedrock runtime endpoint)</div>
+  <div class="tag clear" style="left:560px;top:816px;color:#5A2BB5;">7a: embed query (Bedrock runtime endpoint)</div>
   <div class="tag" style="left:530px;top:594px;color:#5A2BB5;">search_catalog runs here</div>
-  <div class="tag clear" style="left:476px;top:699px;color:#5A2BB5;">vector search</div>
+  <div class="tag clear" style="left:476px;top:699px;color:#5A2BB5;">7b: vector search</div>
   <div class="tag clear" style="left:388px;top:628px;color:#7D8998;">catalog load: invokes the index writer</div>
 
 
@@ -157,7 +158,8 @@
   <div class="step" style="left:729px;top:208px;">4</div>
   <div class="step" style="left:1057px;top:318px;">5</div>
   <div class="step" style="left:658px;top:350px;">6</div>
-  <div class="step" style="left:700px;top:590px;">7</div>
+  <div class="step" style="left:374px;top:703px;">7</div>
+  <div class="step dep" style="left:372px;top:574px;">D</div>
   <div class="step" style="left:791px;top:589px;">8</div>
   <div class="step" style="left:102px;top:600px;">9</div>
 
@@ -169,7 +171,7 @@
     <div class="row"><div class="b">4</div><div class="x"><b>Amazon Nova 2.5 Sonic</b> on <b>Amazon Bedrock</b>, a speech-to-speech model, returns text transcripts of what the shopper said: partial transcripts start a speculative search, and the final one starts the turn. It speaks the reply the app gives it, out loud only when Voice is on or to ask a yes/no question.</div></div>
     <div class="row"><div class="b">5</div><div class="x">The turn pipeline asks <b>Strands Decider 2B</b> on an <b>Amazon SageMaker AI</b> real-time endpoint typed questions in parallel: intent, who it is for, department, category, which card, and change-of-mind re-checks. Each answer returns with a calibrated probability, and per-question thresholds decide: act, show results and ask one question, or treat it as not said.</div></div>
     <div class="row"><div class="b">6</div><div class="x">Tool calls go over MCP, with IAM authentication, through <b>Amazon Bedrock AgentCore Gateway</b> to five <b>AWS Lambda</b> functions. <b>AgentCore Memory</b> keeps the shopper&#39;s preferences for the next visit.</div></div>
-    <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it embeds the shopper&#39;s query with <b>Amazon Titan Text Embeddings V2</b> and runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>.</div></div>
+    <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it (7a) embeds the shopper&#39;s query with <b>Amazon Titan Text Embeddings V2</b>, then (7b) runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>.</div></div>
     <div class="row"><div class="b">8</div><div class="x">The product detail, cart and order tools use <b>Amazon DynamoDB</b>. Cart and order writes are idempotent transactions; an order always needs a separate yes, and no payment is taken.</div></div>
     <div class="row"><div class="b">9</div><div class="x">The screen updates first, in about a second: the shelf, and chips, small labels such as For: Mom or Under $80 that show each preference the app understood. Product images load from a private <b>Amazon S3</b> bucket through presigned URLs valid for one hour.</div></div>
     <h3 style="margin-top:12px;">Deploy and operations</h3>
