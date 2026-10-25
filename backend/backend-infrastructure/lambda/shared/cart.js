@@ -20,7 +20,7 @@ async function readCartItems(sessionId) {
       new QueryCommand({
         TableName: process.env.CART_TABLE_NAME,
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :item)',
-        FilterExpression: 'attribute_not_exists(expiresAt) OR expiresAt > :now',
+        FilterExpression: 'expiresAt > :now',   // the same test add_to_cart's condition uses
         ExpressionAttributeValues: { ':pk': cartPk(sessionId), ':item': 'ITEM#', ':now': Math.floor(Date.now() / 1000) },
         ExclusiveStartKey: exclusiveStartKey,
         ConsistentRead: true,

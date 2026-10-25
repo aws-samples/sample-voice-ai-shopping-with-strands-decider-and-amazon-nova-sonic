@@ -379,3 +379,20 @@ def test_add_another_one_still_adds():
 def test_huge_amounts_never_overflow():
     import filters
     assert filters.parse_budget('under 1' + '0' * 306).max_cents == filters.MAX_PRICE_CENTS
+
+
+class FullLineTools(FakeTools):
+    async def add_to_cart(self, args):
+        self.calls.append(('add', args))
+        return {'error': 'QuantityLimit', 'message': 'At most 10', 'cart': self.cart}
+
+
+def test_the_line_limit_is_said_and_the_cart_refreshed():
+    async def go():
+        p, tools, _, _ = make(MOM, tools=FullLineTools())
+        await p.on_final('a gift for my mom')
+        x = CATALOG[0]['asin']
+        tools._set([{'asin': x, 'title': 't', 'quantity': 10, 'priceCents': 100}])
+        return p, await p._add(p.state.turn_seq, x, f'add_more:{x}')
+    p, outcome = run(go())
+    assert 'at most 10' in outcome['say'] and p.state.cart['itemCount'] == 10

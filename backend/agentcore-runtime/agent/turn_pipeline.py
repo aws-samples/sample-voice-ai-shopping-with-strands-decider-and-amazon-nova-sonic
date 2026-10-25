@@ -741,8 +741,8 @@ class TurnPipeline:
         return await self._add(turn, asin, offer if offer and offer.startswith(('add_to_cart:', 'add_more:')) else f'add_to_cart:{asin}')
 
     def _offer_again(self, offer: str, say: str) -> dict:
-        """A write that may or may not have happened: ask again. Retrying is safe, because the
-        cart tools say what they expect (an add is compare-and-set, an order checks for itself)."""
+        """An add that may or may not have happened: ask again. Retrying is safe, because the add
+        is compare-and-set: it changes nothing if the cart already moved on."""
         self.state.pending_offer = offer
         return {'directive': 'ask', 'confirmation': True, 'say': say}
 
@@ -762,6 +762,10 @@ class TurnPipeline:
         except Exception:  # noqa: BLE001
             logger.error('❌ add_to_cart failed', exc_info=True)
             return self._offer_again(offer, "I couldn't confirm that it was added. Should I try again?")
+        if result.get('error') == 'QuantityLimit' and 'cart' in result:
+            state.cart = result['cart']
+            await deps.send(ui_events.cart(state.cart))
+            return {'directive': 'act', 'say': f"A cart holds at most 10 of one product. {cart_summary(state.cart)}"}
         if 'cart' not in result:
             return {'directive': 'error', 'say': "I couldn't add that to the cart."}
         state.cart = result['cart']
@@ -801,14 +805,11 @@ class TurnPipeline:
             except Exception:  # noqa: BLE001
                 logger.error('❌ place_order failed (attempt %d)', attempt + 1, exc_info=True)
         if result is None:
-            return self._offer_again('place_order', "I couldn't confirm the order. Should I try again?")
+            return {'directive': 'error', 'say': "I couldn't confirm the order. If the cart is now empty, it was placed."}
         if result.get('error') == 'EmptyCart':
-            # This session saw items, but the store's cart is empty: an earlier order did go through.
-            say = 'The cart is already empty, so your earlier order went through.' if state.cart.get('itemCount') \
-                else 'The cart is empty, so there is nothing to order yet.'
             state.cart = {'items': [], 'itemCount': 0, 'totalCents': 0}
             await deps.send(ui_events.cart(state.cart))
-            return {'directive': 'act', 'say': say}
+            return {'directive': 'act', 'say': 'The cart is empty, so there is nothing to order yet.'}
         order = result.get('order')
         if not order:
             logger.error('❌ place_order returned %s', result.get('error'))

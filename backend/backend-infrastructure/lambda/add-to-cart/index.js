@@ -10,7 +10,7 @@
  *
  * Input:  { sessionId, asin, expectedQuantity }
  * Output: { cart: {items, itemCount, totalCents}, conflict?: true }
- *      or { error: "NotFound" | "Unavailable" | "QuantityLimit" }
+ *      or { error: "NotFound" | "Unavailable" } or { error: "QuantityLimit", cart }
  */
 const { GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const { ddb, productKey } = require('../shared/aws');
@@ -30,7 +30,8 @@ function parse(input) {
 
 async function run({ sessionId, asin, expectedQuantity }) {
   if (expectedQuantity >= MAX_PER_LINE) {
-    return { error: 'QuantityLimit', message: `At most ${MAX_PER_LINE} of one product per cart` };
+    return { error: 'QuantityLimit', message: `At most ${MAX_PER_LINE} of one product per cart`,
+             cart: summarizeCart(await readCartItems(sessionId)) };
   }
   const { Item: product } = await ddb.send(
     new GetCommand({ TableName: process.env.PRODUCTS_TABLE_NAME, Key: productKey(asin) }),
