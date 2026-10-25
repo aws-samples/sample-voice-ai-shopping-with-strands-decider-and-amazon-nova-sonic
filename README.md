@@ -62,14 +62,19 @@ The session host (Python, FastAPI) runs the turn pipeline and the decision polic
 
 ### User request flow
 
-1. The shopper opens the web app on **AWS Amplify Hosting** and signs in. **Amazon Cognito** authenticates the shopper, and the identity pool returns temporary AWS credentials that can only open the session host WebSocket.
-2. The browser opens a SigV4-signed WebSocket to **Amazon Bedrock AgentCore Runtime**. It streams microphone audio, or sends typed text. AgentCore Runtime starts one microVM for the session.
-3. **Amazon Nova 2.5 Sonic**, a speech-to-speech model, returns text transcripts of what the shopper said and speaks the reply. It speaks only when the shopper has turned spoken replies on, or to ask a yes/no question. A partial transcript starts a speculative catalog search, and the final transcript starts the turn.
-4. The session host sends typed questions to **Strands Decider 2B** on the **Amazon SageMaker AI** endpoint: the intent, who the item is for, the department, then the category within it, the budget, and which card the shopper means. Each answer comes with a calibrated confidence. Depending on that confidence, the code acts, shows results while asking one short question, or offers a yes/no choice.
-5. The session host calls tools through **Amazon Bedrock AgentCore Gateway** (MCP, IAM), which invokes **AWS Lambda** functions. Code enforces every committed filter. **Amazon Bedrock AgentCore Memory** keeps preferences for the next visit.
-6. The `search_catalog` Lambda function runs in an isolated VPC subnet. It embeds the shopper's query with **Amazon Titan Text Embeddings V2** and runs a filtered vector search in **Amazon OpenSearch Serverless** through the collection's VPC endpoint. Carts and orders are **Amazon DynamoDB** transactions.
-7. The screen updates first, in about one second: the shelf, and the chips, small labels such as **For: Mom** or **Under $80** that show each preference the app understood. Each chip filters the search, and the shopper can remove it with a tap. Product images arrive as presigned **Amazon S3** URLs.
-8. At deploy time, `deploy-all.sh` builds both container images in **AWS CodeBuild** (no local Docker), stores them in **Amazon ECR**, creates the endpoint, and loads the catalog. **Amazon CloudWatch** collects logs, per-turn records and latency metrics. Every role is least-privilege, scoped by **AWS IAM**.
+The numbers match the architecture diagram and follow one spoken sentence.
+
+1. The shopper opens the React web app on **AWS Amplify**, in a browser on a computer or phone.
+2. The app signs the shopper in with **Amazon Cognito**, which returns JWT tokens. The identity pool exchanges them for temporary AWS credentials that can only open the session host WebSocket.
+3. The browser opens a SigV4-signed WebSocket to the session host on **Amazon Bedrock AgentCore Runtime**, one microVM per shopping session. The host verifies the Cognito token in the first message; then the browser streams microphone audio, or sends typed text.
+4. **Amazon Nova 2.5 Sonic**, a speech-to-speech model on **Amazon Bedrock**, returns text transcripts of what the shopper said. A partial transcript starts a speculative catalog search, and the final transcript starts the turn. Sonic speaks the reply the app gives it, only when spoken replies are on or to ask a yes/no question.
+5. The session host sends typed questions to **Strands Decider 2B** on the **Amazon SageMaker AI** endpoint: the intent, who the item is for, the department, then the category within it, and which card the shopper means. Each answer comes with a calibrated confidence. Depending on that confidence, the code acts, shows results while asking one short question, or offers a yes/no choice. Budgets are parsed in code.
+6. The session host calls tools over MCP, with IAM authentication, through **Amazon Bedrock AgentCore Gateway**, which invokes five **AWS Lambda** functions. **Amazon Bedrock AgentCore Memory** keeps preferences for the next visit.
+7. The `search_catalog` Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it embeds the shopper's query with **Amazon Titan Text Embeddings V2** and runs a filtered vector search in **Amazon OpenSearch Serverless**.
+8. The product detail, cart and order tools use **Amazon DynamoDB**. Cart and order writes are idempotent transactions, and an order always needs a separate yes.
+9. The screen updates first, in about one second: the shelf, and the chips, small labels such as **For: Mom** or **Under $80** that show each preference the app understood. Each chip filters the search, and the shopper can remove it with a tap. Product images arrive as presigned **Amazon S3** URLs.
+
+At deploy time, `deploy-all.sh` builds both container images in **AWS CodeBuild** (no local Docker), stores them in **Amazon ECR**, creates the endpoint, and loads the catalog. **Amazon CloudWatch** collects logs, per-turn records and latency metrics. Every role is least-privilege, scoped by **AWS IAM**.
 
 ### The turn pipeline
 
