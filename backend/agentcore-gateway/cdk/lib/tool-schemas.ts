@@ -49,8 +49,7 @@ export const TOOLS: Tool[] = [
     targetName: 'add-to-cart',
     definition: {
       name: 'add_to_cart',
-      description: 'Add one of a product to the session cart, compare-and-set: the line becomes expectedQuantity + 1 only if '
-        + 'the cart holds expectedQuantity of it; otherwise nothing changes and conflict is true. Returns the cart with integer totals.',
+      description: 'Add one of a product if the cart holds expectedQuantity of it (else no change, conflict). Returns the cart.',
       inputSchema: {
         type: T.OBJECT,
         properties: {
