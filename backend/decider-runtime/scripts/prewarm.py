@@ -14,6 +14,7 @@ import time
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 REQUEST = {
     "state": 'Latest shopper sentence: "a gift for my mom under 80 dollars"\nCommitted: none',
@@ -48,8 +49,10 @@ def main() -> int:
         print(f"   ... {status}, waiting")
         time.sleep(30)
 
+    # The first call compiles the GPU kernels (about 40 s); "standard" mode with one attempt means
+    # no hidden retry that would queue behind it.
     runtime = boto3.client("sagemaker-runtime", region_name=args.region,
-                           config=Config(read_timeout=30, retries={"max_attempts": 1}))
+                           config=Config(read_timeout=120, retries={"max_attempts": 1, "mode": "standard"}))
 
     def invoke():
         started = time.perf_counter()
@@ -58,7 +61,16 @@ def main() -> int:
         body = json.loads(response["Body"].read())
         return (time.perf_counter() - started) * 1000, body
 
-    first_ms, body = invoke()
+    # The decider answers 503 busy while its queue is full (serve.py); wait and try again.
+    for attempt in range(10):
+        try:
+            first_ms, body = invoke()
+            break
+        except ClientError as exc:
+            if exc.response.get("OriginalStatusCode") != 503 or attempt == 9:
+                raise
+            print("   ... decider busy (still warming up), retrying in 10 s")
+            time.sleep(10)
     if not body.get("gpu"):
         print(f"❌ the decider answered without a GPU: {body}", file=sys.stderr)
         return 1
