@@ -568,6 +568,11 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **Language support.** The questions and prompts are in English.
 - **Voice quality.** Real-time streaming needs a stable internet connection.
 - **One item at a time.** The cart adds one item per request. "Add items 1, 5 and 3" is not supported yet.
+- **One action per sentence.** Each sentence gets one intent: "close this one and open number nine" only closes.
+- **Speech that is not for the store.** The microphone hears everything in the room; a TV or another conversation can become a shopping sentence. Turn the mic off when you are not shopping.
+- **Budget phrasing.** Amounts are parsed in code ("under 80 dollars", "between 20 and 40"). Unusual phrasings can be missed or misread; the budget always appears as a chip you can remove.
+- **Fair use under load.** Limits apply per shopper and in the decider's queue. One shopper sending sentences very fast can make others see "Busy" for a few seconds; the decider itself is never overloaded.
+- **Two tabs on one session.** Each tab keeps its own view of the cart. A change in one tab can make the other say "That is already in your cart" or "Your cart changed"; nothing is added twice.
 
 ### Further reading
 

@@ -376,15 +376,17 @@ class TurnPipeline:
             # ask about that one change, and keep the shelf until the shopper answers.
             plan = policy.UnderstandPlan(intent='ask_offer', intent_band=plan.intent_band, confirmation=True,
                                          offer=f'switch:{unsure[0]}:{unsure[1]}')
-        if plan.intent == 'pointing' and plan.intent_band == 'act':
-            # A confident pointing sentence chooses a card on the current screen; it does not
-            # narrow. New chips from the open-slot questions are dropped: they are read with the
-            # shelf in the context and can pick up its contents ("number three" committed Tops,
-            # and the hard filter then refused No. 3, a dress; live session, 2026-10-23). A change
-            # of mind, re-checked with the latest sentence alone, still applies.
+        if plan.intent != 'narrowing' and plan.intent_band == 'act':
+            # The decider's reading adds chips only on a narrowing sentence. Any other confident
+            # sentence (pointing, confirm, close, show more, remove, order...) acts on what is on
+            # screen, and the open-slot answers, read with the earlier sentences and the open
+            # product in the context, can pick those up: "number three" committed Tops (2026-10-23)
+            # and "yeah i got it" committed Boys' Tops (2026-10-25), and the hard filter then refused
+            # cards on screen. Kept: a change of mind (re-checked with the latest sentence alone),
+            # what it implies (a chip whose source names that slot), and an amount stated in this
+            # sentence (parsed in code, so it is what the shopper said).
             kept = {'budget' if q == 'budget_band' else q for q in changes}
-            # A chip implied by another chip (its source names that slot) follows it.
-            plan.commits = {k: v for k, v in plan.commits.items() if k in kept or v.source in kept}
+            plan.commits = {k: v for k, v in plan.commits.items() if k in kept or v.source in kept or v.source == 'stated'}
         if plan.intent != 'confirm':
             state.pending_offer = None   # an offer answers only the very next sentence
         if plan.intent == 'narrowing':

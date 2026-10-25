@@ -1045,3 +1045,20 @@ def test_a_question_that_waits_for_an_answer_is_spoken_with_voice_off():
         return await p.on_final('that one')
     outcome = run(go())
     assert outcome['say'].startswith('Which number do you mean') and outcome['speak']
+
+
+def test_a_confirm_sentence_adds_no_chips():
+    """'yeah i got it' (a yes) committed Kids & Teens / Boys' Tops from the open-slot answers, and the
+    next cards on screen could not be opened (live session, 2026-10-25)."""
+    async def go():
+        p, *_ = make(MOM)
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        before = dict(department=p.state.department, category=p.state.category)
+        p.deps.ask_decider.script = {'intent': ans('intent', 'confirm', 0.95),
+                                     'department': ans('department', 'Bags & Accessories', 0.9)}
+        await p.on_final('yeah i got it')
+        return before, p
+    before, p = run(go())
+    assert p.state.department == before['department'] and p.state.category == before['category']
