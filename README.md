@@ -568,6 +568,7 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **Language support.** The questions and prompts are in English.
 - **Voice quality.** Real-time streaming needs a stable internet connection.
 - **One item at a time.** The cart adds one item per request. "Add items 1, 5 and 3" is not supported yet.
+- **Some ways of naming a card.** When the decider is unsure what a sentence wants, the store searches (the safe default). Phrasings such as "open number eight", "number three looks nice, add it" or "add another one" can land there. "Number eight", "I like number eight" and "add number three" are read reliably. Better coverage needs new intent option descriptions and a re-calibration with the evaluation, as described in docs/how-we-tuned-it.md.
 - **One action per sentence.** Each sentence gets one intent: "close this one and open number nine" only closes.
 - **Speech that is not for the store.** The microphone hears everything in the room; a TV or another conversation can become a shopping sentence. Turn the mic off when you are not shopping.
 - **Budget phrasing.** Amounts are parsed in code ("under 80 dollars", "between 20 and 40"). Unusual phrasings can be missed or misread; the budget always appears as a chip you can remove.
