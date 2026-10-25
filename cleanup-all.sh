@@ -170,15 +170,15 @@ print(json.dumps({"Objects": [{"Key": i["Key"], "VersionId": i["VersionId"]} for
 }
 
 # Log groups AWS services create on first use, so no stack owns them. Matched
-# only by VoiceShop prefixes.
+# only by VoiceShop resource-name prefixes, each ending at a name delimiter.
 LOG_GROUP_PREFIXES=(
   /aws/codebuild/VoiceShop-
   /aws/sagemaker/Endpoints/voiceshop-
   /aws/lambda/VoiceShop-
   /aws/bedrock-agentcore/runtimes/voiceshop_
   /aws/vendedlogs/bedrock-agentcore/runtime/APPLICATION_LOGS/voiceshop_
-  /aws/vendedlogs/bedrock-agentcore/gateway/APPLICATION_LOGS/voiceshop
-  /voiceshop/
+  /aws/vendedlogs/bedrock-agentcore/gateway/APPLICATION_LOGS/voiceshop-gateway-
+  /voiceshop/network/
 )
 
 delete_leftover_log_groups() {

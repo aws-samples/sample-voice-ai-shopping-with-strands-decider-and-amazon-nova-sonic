@@ -173,6 +173,12 @@ describe('CognitoStack', () => {
     expect(new Set(actionsOf(t.cognito))).toEqual(new Set(['bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream']));
   });
 
+  test('the app client has no OAuth redirect flows', () => {
+    t.cognito.hasResourceProperties('AWS::Cognito::UserPoolClient', {
+      AllowedOAuthFlowsUserPoolClient: false,
+    });
+  });
+
   test('a revoked sign-in gets no AWS credentials', () => {
     t.cognito.hasResourceProperties('AWS::Cognito::IdentityPool', {
       AllowUnauthenticatedIdentities: false,

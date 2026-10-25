@@ -8,6 +8,7 @@ does this arithmetic: amounts are parsed here, in code.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
@@ -51,6 +52,11 @@ def words_to_number(text: str) -> int | None:
     return total + current
 
 
+# The search tool rejects prices above $100,000 (MAX_PRICE_CENTS in the Lambda validation); a
+# larger spoken amount is no real limit, so it is capped there instead of failing every search.
+MAX_PRICE_CENTS = 10_000_000
+
+
 def _to_cents(amount: str) -> int | None:
     amount = amount.strip()
     if re.match(r'^\$?\s?\d', amount):
@@ -60,7 +66,9 @@ def _to_cents(amount: str) -> int | None:
         if number is None:
             return None
         value = float(number)
-    return round(value * 100) if value > 0 else None
+    if not (value > 0 and math.isfinite(value)):
+        return None
+    return min(round(value * 100), MAX_PRICE_CENTS)
 
 
 @dataclass(frozen=True)

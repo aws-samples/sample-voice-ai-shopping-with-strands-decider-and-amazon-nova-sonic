@@ -259,9 +259,14 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception:  # noqa: BLE001
             pass
     finally:
-        if bridge:
-            await bridge.stop()
-        await state_store.save(state)
+        try:
+            if 'pipeline' in locals():
+                pipeline.close()
+            if bridge:
+                await bridge.stop()
+        finally:
+            # Also when the endpoint itself is cancelled, so the last state is not lost.
+            await asyncio.shield(state_store.save(state))
 
 
 if __name__ == '__main__':

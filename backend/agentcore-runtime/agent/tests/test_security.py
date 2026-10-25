@@ -253,3 +253,78 @@ def test_a_sentence_after_a_waiting_turn_also_waits_for_the_cart_write():
         await p.on_final('show me more like this')
         return started_after_add
     assert run(go()) == [True]
+
+
+def test_huge_spoken_amounts_are_capped_not_fatal():
+    import filters
+    assert filters.parse_budget('under $' + '9' * 400) is None   # infinite: no budget, no crash
+    assert filters.parse_budget('under $' + '9' * 30).max_cents == filters.MAX_PRICE_CENTS
+    assert filters.parse_budget('under 80 dollars').max_cents == 8000
+
+
+class SlowAddTools(FakeTools):
+    """The add commits in the store but its response never arrives in time."""
+
+    def __init__(self):
+        super().__init__()
+        self.timeouts = 1
+
+    async def add_to_cart(self, args):
+        result = await super().add_to_cart(args)
+        if self.timeouts:
+            self.timeouts -= 1
+            raise turn_pipeline.ToolError('add_to_cart timed out')
+        return result
+
+
+def test_a_retried_add_after_a_timeout_reuses_its_key():
+    async def go():
+        p, tools, _, _ = make(MOM, tools=SlowAddTools())
+        await p.on_final('a gift for my mom')
+        first = await p._add(p.state.turn_seq, CATALOG[0]['asin'])
+        second = await p._add(p.state.turn_seq, CATALOG[0]['asin'])
+        return first, second, tools
+    first, second, tools = run(go())
+    keys = [a['idempotencyKey'] for kind, a in tools.calls if kind == 'add']
+    assert first['directive'] == 'error' and second['directive'] == 'act'
+    assert keys[0] == keys[1] and tools.cart['items'][0]['quantity'] == 1
+
+
+def test_closing_the_socket_stops_a_turn_that_is_not_writing():
+    async def go():
+        p, *_ = make(MOM, tools=FakeTools(search_delay=0.5))
+        p.on_final('a gift for my mom')
+        await asyncio.sleep(0.05)
+        turn = p._turn_task
+        p.close()
+        await asyncio.sleep(0)
+        return turn
+    turn = run(go())
+    assert turn.cancelled()
+
+
+def test_a_stopped_bridge_never_publishes_a_late_stream(monkeypatch):
+    import sonic_bridge
+
+    class FakeAgent:
+        stopped = False
+        def __init__(self, **_): pass
+        async def start(self): await asyncio.sleep(0)
+        async def stop(self): FakeAgent.stopped = True
+        async def receive(self):
+            await asyncio.Event().wait()
+            yield {}
+
+    monkeypatch.setattr(sonic_bridge, 'BidiAgent', FakeAgent)
+    monkeypatch.setattr(sonic_bridge, 'BedrockNovaSonicModel', lambda **_: None)
+
+    async def go():
+        bridge = sonic_bridge.SonicBridge.__new__(sonic_bridge.SonicBridge)
+        bridge.__dict__.update(remembered=[], region='us-east-1', model_id='m', voice='v', agent=None, _receiver=None,
+                               _silence=None, _opening=None, _background=set(), _stopped=False, pipeline=None)
+        bridge._tools = lambda: []
+        await bridge.stop()
+        await bridge.start()
+        return bridge
+    bridge = run(go())
+    assert bridge.agent is None and FakeAgent.stopped

@@ -73,6 +73,7 @@ export class CognitoStack extends cdk.Stack {
       // A stolen refresh token stays useful for 12 hours, not the 30-day default.
       refreshTokenValidity: cdk.Duration.hours(12),
       generateSecret: false, // public browser client
+      disableOAuth: true, // no hosted UI or OAuth redirect flows; the app signs in with SRP
       preventUserExistenceErrors: true,
     });
 

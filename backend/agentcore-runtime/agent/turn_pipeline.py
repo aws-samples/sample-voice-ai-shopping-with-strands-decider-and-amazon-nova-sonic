@@ -117,6 +117,9 @@ class TurnPipeline:
         # was cancelled before it closed the product, and the next sentence added them again.
         self._committing: asyncio.Task | None = None
         self._decider_slots = asyncio.Semaphore(DECIDER_SLOTS)
+        # Idempotency key of an add that failed or timed out, by ASIN: the add may have committed,
+        # so the shopper's retry reuses it and cannot add a second unit by accident.
+        self._retry_keys: dict[str, str] = {}
         self._turns = TokenBucket(*TURN_RATE)
         self._round_answers: dict = {}
         self._background: set[asyncio.Task] = set()   # fire-and-forget work, kept referenced
@@ -176,6 +179,16 @@ class TurnPipeline:
         outcome = self._outcome
         self._turn_task = asyncio.create_task(self._run_turn(text, outcome, after))
         return outcome
+
+    def close(self) -> None:
+        """The socket closed: stop work nobody will see. A turn that is writing to the cart
+        finishes, and state saves already started are left to complete."""
+        for task in (self._spec_timer, self._spec[1] if self._spec else None):
+            if task and not task.done():
+                task.cancel()
+        turn = self._turn_task
+        if turn and not turn.done() and self._committing is not turn:
+            turn.cancel()
 
     async def turn_outcome(self, hold_s: float = OUTCOME_HOLD_S) -> dict:
         """What Sonic may say about the newest turn (get_turn_outcome tool)."""
@@ -748,10 +761,11 @@ class TurnPipeline:
     @_cart_serialized
     async def _add(self, turn: int, asin: str) -> dict:
         state, deps = self.state, self.deps
+        key = self._retry_keys.pop(asin, None) or request_key(state.session_id)
         try:
             started = time.perf_counter()
             result = await deps.tools.add_to_cart({'sessionId': state.session_id, 'asin': asin, 'quantity': 1,
-                                                   'idempotencyKey': request_key(state.session_id)})
+                                                   'idempotencyKey': key})
             cart = result.get('cart') or {}
             await self._activity('dynamodb', 'Added to the cart: one DynamoDB transaction on VoiceShop-Cart',
                                  f"1 × {next((p['title'] for p in state.shelf if p['asin'] == asin), asin)[:60]} · cart now "
@@ -759,6 +773,7 @@ class TurnPipeline:
                                  'a retry with the same request key changes nothing', (time.perf_counter() - started) * 1000)
         except Exception:  # noqa: BLE001
             logger.error('❌ add_to_cart failed', exc_info=True)
+            self._retry_keys[asin] = key
             return {'directive': 'error', 'say': "I couldn't add that to the cart."}
         if 'cart' not in result:
             return {'directive': 'error', 'say': "I couldn't add that to the cart."}

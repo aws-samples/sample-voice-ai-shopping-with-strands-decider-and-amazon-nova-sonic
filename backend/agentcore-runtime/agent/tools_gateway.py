@@ -30,7 +30,7 @@ from turn_pipeline import ToolError
 logger = logging.getLogger(__name__)
 
 TOOL_NAMES = ('search_catalog', 'get_product_detail', 'add_to_cart', 'remove_from_cart', 'place_order')
-CALL_TIMEOUT_S = {'search_catalog': 2.5, 'get_product_detail': 2.0, 'add_to_cart': 3.0, 'remove_from_cart': 3.0, 'place_order': 4.0}
+CALL_TIMEOUT_S = {'search_catalog': 2.5, 'get_product_detail': 2.0, 'add_to_cart': 5.0, 'remove_from_cart': 5.0, 'place_order': 5.0}
 
 
 class GatewayTools:

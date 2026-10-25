@@ -88,6 +88,7 @@ class SonicBridge:
         self._opening: asyncio.Task | None = None
         self._pending: list[bytes] = []
         self._background: set[asyncio.Task] = set()
+        self._stopped = False
 
     def _spawn(self, coro) -> None:
         task = asyncio.create_task(coro)
@@ -156,12 +157,20 @@ class SonicBridge:
             except Exception:  # noqa: BLE001
                 pass
             raise
+        if self._stopped:
+            # The socket closed while the stream was opening: nobody would use it.
+            await agent.stop()
+            return
         # Published only once it is running: a failed (re)open leaves no dead stream behind.
         self.agent = agent
         self._receiver = asyncio.create_task(self._receive(agent))
         logger.info('✅ Sonic stream open (%s, voice %s)', self.model_id, self.voice)
 
     async def stop(self) -> None:
+        self._stopped = True
+        for task in [self._opening, *self._background]:
+            if task and not task.done():
+                task.cancel()
         if self._silence:
             self._silence.cancel()
         if self._receiver:
