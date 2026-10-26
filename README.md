@@ -545,7 +545,7 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **The GPU endpoint runs all the time.** The decider endpoint keeps at least one GPU instance running while it is deployed. Clean up when you are not testing.
 - **Private search.** The search collection accepts requests only through its VPC endpoint, and each request must be SigV4-signed by a role named in a data access policy. Only the two functions that call it run in the VPC. The decider container has no network access at all ([ADR-32](docs/architecture-decisions.md#adr-32-private-search-collection)).
 - **Availability.** The search VPC uses one Availability Zone, and the decider scales to one instance by default. Use two or more zones and instances in production.
-- **Data retention.** The Sessions and Cart tables use DynamoDB TTL (`expiresAt`) to remove old items automatically.
+- **Data retention.** The Sessions and Cart tables use DynamoDB TTL (`expiresAt`) to remove old items automatically. AgentCore Memory keeps conversation events for 30 days.
 - **Compliance.** Make sure voice data handling complies with local regulations (GDPR, CCPA and others) before you deploy to production.
 - **Accessibility.** Test the frontend with screen readers and keyboard navigation for accessibility compliance.
 - **IAM.** This sample creates one least-privilege IAM role per component. Review the IAM policies in each CDK stack against your organization's security requirements.
@@ -559,6 +559,8 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
   - Build-time installs: the container images install from hashed lock files, but four build and deploy steps (the model download, the catalog load, the latency measurement and the deploy script's prewarm) pin only their top-level Python package. For production, give these hashed locks too.
 
   For production, turn on MFA, remove the password flow, put the Debug overlay behind a flag, review data retention, consider customer managed keys and point-in-time recovery and retain data on stack deletion.
+
+- **Production controls not included.** The sample does not set up Amazon Bedrock Guardrails (harmful content, profanity and PII filters) for the spoken replies and transcripts, Amazon Bedrock model invocation logging, AWS X-Ray tracing or AgentCore observability, a configurable log level (the code logs at INFO), Amazon S3 lifecycle rules (the access-log bucket keeps its logs until the stack is deleted), AWS CloudTrail data events, AWS Config rules or Amazon CloudWatch alarms. Add the ones your organization requires before you use this in production.
 
 - **Python dependencies are locked.** Each container's `requirements.txt` is a lock file with hashes, generated from `requirements.in` by [uv](https://docs.astral.sh/uv/); the command is in the file header. To change a dependency, edit `requirements.in` and regenerate the lock.
 
