@@ -20,8 +20,10 @@ from state import SessionState
 logger = logging.getLogger(__name__)
 
 TTL_S = 24 * 3600
-# Sentences per shopper per minute, typed or spoken, across all of their connections.
-USER_TURNS_PER_MINUTE = int(os.environ.get('USER_TURNS_PER_MINUTE', '60'))
+# Sentences per shopper per minute, typed or spoken, across all of their connections. A shopper
+# speaks about 6-15 a minute; at 20 (about 80 decider calls) one shopper uses at most about a third
+# of one decider instance (about 4 calls a second).
+USER_TURNS_PER_MINUTE = int(os.environ.get('USER_TURNS_PER_MINUTE', '20'))
 USER_CHECK_TIMEOUT_S = 0.5   # a slow DynamoDB answer lets the turn through rather than holding it
 _table = None
 

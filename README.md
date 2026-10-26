@@ -555,7 +555,8 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
   - The Debug overlay data (decider probabilities, timings, service names) is sent to every shopper.
   - Recent turns, with their transcripts, are kept in the Sessions table for 24 hours. Transcripts stay out of the logs unless `LOG_TRANSCRIPTS=true` is set on the session host.
   - Data is encrypted with AWS managed keys (no customer managed AWS KMS keys), DynamoDB point-in-time recovery is off, every stack's resources are deleted with the stack, and `deploy-all.sh` deploys without approval prompts (`--require-approval never`).
-  - Rate limits: browser messages per connection, 60 sentences a minute per shopper across all connections (`USER_TURNS_PER_MINUTE`), and a queue of 16 calls in the decider (`DECIDER_MAX_QUEUE`), beyond which it answers busy and the turn keeps the current results. Tune these for your traffic.
+  - Rate limits: browser messages per connection, 20 sentences a minute per shopper across all connections (`USER_TURNS_PER_MINUTE`), and a queue of 16 calls in the decider (`DECIDER_MAX_QUEUE`), beyond which it answers busy and the turn keeps the current results. Tune these for your traffic, and raise `deciderMaxInstances` for many concurrent shoppers.
+  - Build-time installs: the container images install from hashed lock files, but four build and deploy steps (the model download, the catalog load, the latency measurement and the deploy script's prewarm) pin only their top-level Python package. For production, give these hashed locks too.
 
   For production, turn on MFA, remove the password flow, put the Debug overlay behind a flag, review data retention, consider customer managed keys and point-in-time recovery and retain data on stack deletion.
 
@@ -572,7 +573,7 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **One action per sentence.** Each sentence gets one intent: "close this one and open number nine" only closes.
 - **Speech that is not for the store.** The microphone hears everything in the room; a TV or another conversation can become a shopping sentence. Turn the mic off when you are not shopping.
 - **Budget phrasing.** Amounts are parsed in code ("under 80 dollars", "between 20 and 40"). Unusual phrasings can be missed or misread; the budget always appears as a chip you can remove.
-- **Fair use under load.** Limits apply per shopper and in the decider's queue. One shopper sending sentences very fast can make others see "Busy" for a few seconds; the decider itself is never overloaded.
+- **Fair use under load.** A shopper sending more than 20 sentences a minute is held back, and the decider's queue is capped, so it is never overloaded. With one decider instance (the default), several shoppers talking at once can still see "Busy"; raise `deciderMaxInstances` for more concurrent shoppers.
 - **Two tabs on one session.** Each tab keeps its own view of the cart. A change in one tab can make the other say "That is already in your cart" or "Your cart changed"; nothing is added twice.
 
 ### Further reading
