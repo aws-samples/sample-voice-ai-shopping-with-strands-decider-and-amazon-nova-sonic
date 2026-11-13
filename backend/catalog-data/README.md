@@ -28,7 +28,7 @@ This package has two parts: the **generator**, run once by a maintainer, and the
 1. checks the zip named in `catalog/catalog.lock.json` against its sha256 and stops if it differs;
 2. checks every row and skips (and counts) invalid ones;
 3. uploads each image to the private images bucket as `products/<asin>/image.webp`;
-4. embeds each product with Amazon Titan Text Embeddings V2 (1,024 dimensions);
+4. embeds each product with Amazon Nova Multimodal Embeddings, averaging its words and its photo into one 1,024-dimension vector (ADR-35);
 5. writes the index documents to the images bucket (`catalog-index/documents.ndjson`) and invokes `VoiceShop-CatalogIndexWriter`, which deletes and recreates the `products` index of the `voiceshop-catalog` collection, indexes every product and waits until they are searchable; the file is then removed;
 6. writes `VoiceShop-Products` and `CATALOG#META` (departments with their categories, option descriptions from the taxonomy, genders, counts, price range);
 7. removes products and images that are no longer in the catalog, and prints the counts.

@@ -24,7 +24,7 @@ export interface LambdaStackProps extends cdk.StackProps {
 }
 
 const CATALOG_INDEX_NAME = 'products';
-const TITAN_EMBED_MODEL_ID = 'amazon.titan-embed-text-v2:0';
+const EMBED_MODEL_ID = 'amazon.nova-2-multimodal-embeddings-v1:0';
 
 /**
  * The five tool Lambdas behind AgentCore Gateway (ADR-12), one least-privilege
@@ -88,7 +88,7 @@ export class LambdaStack extends cdk.Stack {
     searchSecurityGroup.addEgressRule(ec2.Peer.ipv4(props.vpc.vpcCidrBlock), ec2.Port.tcp(443), 'VPC endpoints');
 
     // ---- search_catalog -------------------------------------------------
-    this.searchCatalog = makeFunction('SearchCatalog', 'search_catalog tool: Titan V2 query embedding + filtered k-NN on the catalog collection.', {
+    this.searchCatalog = makeFunction('SearchCatalog', 'search_catalog tool: Nova multimodal query embedding + filtered k-NN on the catalog collection.', {
       COLLECTION_ENDPOINT: props.collection.attrCollectionEndpoint,
       INDEX_NAME: CATALOG_INDEX_NAME,
       IMAGES_BUCKET_NAME: props.imagesBucket.bucketName,
@@ -97,7 +97,7 @@ export class LambdaStack extends cdk.Stack {
     }, 1024, { securityGroup: searchSecurityGroup });
     this.searchCatalog.addToRolePolicy(new iam.PolicyStatement({
       actions: ['bedrock:InvokeModel'],
-      resources: [`arn:${cdk.Aws.PARTITION}:bedrock:${cdk.Aws.REGION}::foundation-model/${TITAN_EMBED_MODEL_ID}`],
+      resources: [`arn:${cdk.Aws.PARTITION}:bedrock:${cdk.Aws.REGION}::foundation-model/${EMBED_MODEL_ID}`],
     }));
     this.searchCatalog.addToRolePolicy(new iam.PolicyStatement({
       actions: ['aoss:APIAccessAll'],

@@ -5,7 +5,7 @@ Invokes the search_catalog Lambda directly (AgentCore Gateway, is not
 deployed yet, so Gateway overhead is not included) and reports, per scenario,
 p50/p95 of:
   - client: InvokeFunction round trip as seen by this script;
-  - embed / search / presign / total: the handler's own timingsMs (Titan V2 query
+  - embed / search / presign / total: the handler's own timingsMs (Nova query
     embedding, filtered kNN + counts on OpenSearch Serverless, thumbnail presigning);
   - overhead: client minus handler total (Lambda invoke + network to this client).
 The first call is reported separately, with the Lambda Init Duration if it was a

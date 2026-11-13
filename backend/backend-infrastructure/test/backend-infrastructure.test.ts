@@ -185,4 +185,17 @@ describe('CognitoStack', () => {
       CognitoIdentityProviders: [Match.objectLike({ ServerSideTokenCheck: true })],
     });
   });
+
+  // A query embedded by one model cannot be compared with a catalog indexed by another, so
+  // the model named here, in the VPC endpoint policy and in the catalog loader must stay the
+  // same one (ADR-35). The loader's copy is asserted in catalog-data/cdk/test.
+  test('search_catalog and the Bedrock endpoint policy name the same embedding model', () => {
+    const model = 'amazon.nova-2-multimodal-embeddings-v1:0';
+    const lambdaPolicies = JSON.stringify(t.lambdas.findResources('AWS::IAM::Policy'));
+    expect(lambdaPolicies).toContain(`foundation-model/${model}`);
+    expect(lambdaPolicies).not.toContain('titan-embed');
+    const endpoints = JSON.stringify(t.network.findResources('AWS::EC2::VPCEndpoint'));
+    expect(endpoints).toContain(`foundation-model/${model}`);
+    expect(endpoints).not.toContain('titan-embed');
+  });
 });

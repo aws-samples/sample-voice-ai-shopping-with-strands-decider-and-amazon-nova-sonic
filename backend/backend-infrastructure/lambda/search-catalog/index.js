@@ -1,6 +1,6 @@
 /**
  * search_catalog tool (Gateway Lambda target). Embeds the shopper's query with
- * Titan Text Embeddings V2 and runs a filtered k-NN search on the catalog
+ * Amazon Nova Multimodal Embeddings and runs a filtered k-NN search on the catalog
  * collection. Price, category, gender and availability are applied as an
  * OpenSearch filter here AND re-applied in the session host's filters.py
  *: this Lambda narrows, it is not the only guard.
@@ -18,7 +18,7 @@ const {
   runTool, requireString, optionalInt, optionalBool, optionalLabelList, optionalEnumList,
 } = require('../shared/validation');
 
-const EMBEDDING_MODEL_ID = 'amazon.titan-embed-text-v2:0';
+const EMBEDDING_MODEL_ID = 'amazon.nova-2-multimodal-embeddings-v1:0';
 const EMBEDDING_DIMENSIONS = 1024;
 const TOTAL_CATALOG_CACHE_MS = 5 * 60 * 1000;
 const SOURCE_FIELDS = ['asin', 'title', 'brand', 'department', 'category', 'gender', 'color', 'priceCents', 'rating', 'ratingCount', 'available'];
@@ -66,10 +66,19 @@ async function embed(text) {
       modelId: EMBEDDING_MODEL_ID,
       contentType: 'application/json',
       accept: 'application/json',
-      body: JSON.stringify({ inputText: text, dimensions: EMBEDDING_DIMENSIONS, normalize: true }),
+      // The catalog is indexed with GENERIC_INDEX; a query is asking, so it uses
+      // GENERIC_RETRIEVAL. Nova returns a unit vector, which the index needs (inner product).
+      body: JSON.stringify({
+        taskType: 'SINGLE_EMBEDDING',
+        singleEmbeddingParams: {
+          embeddingPurpose: 'GENERIC_RETRIEVAL',
+          embeddingDimension: EMBEDDING_DIMENSIONS,
+          text: { value: text, truncationMode: 'END' },
+        },
+      }),
     }),
   );
-  return JSON.parse(Buffer.from(response.body).toString('utf8')).embedding;
+  return JSON.parse(Buffer.from(response.body).toString('utf8')).embeddings[0].embedding;
 }
 
 async function totalCatalog(indexPath) {

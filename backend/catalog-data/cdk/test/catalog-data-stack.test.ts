@@ -35,6 +35,14 @@ test('the index is written only through the index writer: no OpenSearch access o
   t.resourceCountIs('AWS::OpenSearchServerless::AccessPolicy', 0);
 });
 
+test('the loader embeds with the same model the query side uses', () => {
+  // A catalog indexed by one model cannot be searched with another (ADR-35); search_catalog's
+  // copy of this model ID is asserted in backend-infrastructure/test.
+  const policies = JSON.stringify(t.findResources('AWS::IAM::Policy'));
+  expect(policies).toContain('foundation-model/amazon.nova-2-multimodal-embeddings-v1:0');
+  expect(policies).not.toContain('titan-embed');
+});
+
 test('cdk-nag reports no unsuppressed errors', () => {
   expect(Annotations.fromStack(stack).findError('*', Match.stringLikeRegexp('AwsSolutions-.*'))).toEqual([]);
 });

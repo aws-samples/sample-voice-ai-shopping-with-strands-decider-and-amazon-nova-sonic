@@ -107,7 +107,7 @@
   <div class="svc" style="left:376px;top:690px;width:116px;"><img src="icons/vpc.svg"/><div class="n">VPC endpoints</div><div class="d">OpenSearch, Bedrock, S3</div></div>
   <div class="sub" style="left:555px;top:650px;width:655px;height:180px;background:#EBF8F3;border-color:#3FA77A;"><div class="sub-label">Search, catalog, cart and orders</div></div>
   <div class="svc" style="left:575px;top:690px;"><img src="icons/opensearch.svg"/><div class="n">OpenSearch Serverless</div><div class="d">vector search</div></div>
-  <div class="svc" style="left:735px;top:690px;"><img src="icons/bedrock.svg"/><div class="n">Titan Text Embeddings V2</div><div class="d">on Amazon Bedrock</div></div>
+  <div class="svc" style="left:735px;top:690px;"><img src="icons/bedrock.svg"/><div class="n">Nova Multimodal Embeddings</div><div class="d">on Amazon Bedrock</div></div>
   <div class="svc" style="left:905px;top:690px;"><img src="icons/dynamodb.svg"/><div class="n">Amazon DynamoDB</div><div class="d">products, carts, orders</div></div>
   <div class="svc" style="left:1075px;top:690px;"><img src="icons/s3.svg"/><div class="n">Amazon S3</div><div class="d">product images</div></div>
 
@@ -161,7 +161,7 @@
     <div class="row"><div class="b">4</div><div class="x"><b>Amazon Nova 2.5 Sonic</b> on <b>Amazon Bedrock</b>, a speech-to-speech model, returns text transcripts of what the shopper said: partial transcripts start a speculative search, and the final one starts the turn. It speaks the reply the app gives it, out loud only when Voice is on or to ask a yes/no question.</div></div>
     <div class="row"><div class="b">5</div><div class="x">The turn pipeline asks <b>Strands Decider 2B</b> on an <b>Amazon SageMaker AI</b> real-time endpoint typed questions in parallel: intent, who it is for, department, category, which card, and change-of-mind re-checks. Each answer returns with a calibrated probability, and per-question thresholds decide: act, show results and ask one question, or treat it as not said.</div></div>
     <div class="row"><div class="b">6</div><div class="x">Tool calls go over MCP, with IAM authentication, through <b>Amazon Bedrock AgentCore Gateway</b> to five <b>AWS Lambda</b> functions. <b>AgentCore Memory</b> keeps the shopper&#39;s preferences for the next visit.</div></div>
-    <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it (7a) embeds the shopper&#39;s query with <b>Amazon Titan Text Embeddings V2</b>, then (7b) runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>.</div></div>
+    <div class="row"><div class="b">7</div><div class="x">The <b>search_catalog</b> Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it (7a) embeds the shopper&#39;s query with <b>Amazon Nova Multimodal Embeddings</b>, then (7b) runs a filtered vector search in <b>Amazon OpenSearch Serverless</b>, over vectors built from each product&#39;s words and its photo.</div></div>
     <div class="row"><div class="b">8</div><div class="x">The product detail, cart and order tools use <b>Amazon DynamoDB</b>. Cart and order writes are idempotent transactions; an order always needs a separate yes, and no payment is taken. The session host saves its own session state to the Sessions table directly.</div></div>
     <div class="row"><div class="b">9</div><div class="x">The screen updates first, in about a second: the shelf, and chips, small labels such as For: Mom or Under $80 that show each preference the app understood. Product images load from a private <b>Amazon S3</b> bucket through presigned URLs valid for one hour.</div></div>
     <h3 style="margin-top:12px;">Deploy and operations</h3>
@@ -171,7 +171,7 @@
 
   <div class="foot">
     <img src="icons/aws-logo.svg" class="foot-logo"/>
-    <div class="foot-text"><i>Reviewed for technical accuracy October, 2026</i><br/>&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+    <div class="foot-text"><i>Reviewed for technical accuracy November, 2026</i><br/>&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
     <div class="foot-ref">AWS Reference Architecture</div>
   </div>
 </div>

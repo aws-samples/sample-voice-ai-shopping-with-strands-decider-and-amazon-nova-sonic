@@ -76,7 +76,7 @@ export class SearchStack extends cdk.Stack {
       name: CATALOG_COLLECTION_NAME,
       type: 'VECTORSEARCH',
       standbyReplicas: 'DISABLED',
-      description: 'VoiceShop curated catalog: Titan V2 embeddings + metadata filters (ADR-8).',
+      description: 'VoiceShop curated catalog: Nova multimodal embeddings + metadata filters (ADR-8, ADR-35).',
     });
     this.collection.addResourceDependency(encryptionPolicy);
     this.collection.addResourceDependency(networkPolicy);

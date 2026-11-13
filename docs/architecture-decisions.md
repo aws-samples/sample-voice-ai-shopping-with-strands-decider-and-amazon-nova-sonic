@@ -207,7 +207,7 @@ Each record gives the context, the options considered, the decision, its consequ
 | Amazon Bedrock Knowledge Bases | Managed ingestion and RAG | Built for document chunks, not structured catalog rows with hard numeric filters; adds a layer we would work around |
 | In-memory vectors in the session host | Fastest | Off the settled architecture; reloads per session |
 
-**Decision.** OpenSearch Serverless `VECTORSEARCH` collection, standby replicas off, access only through a VPC endpoint (amended by ADR-26 to the public endpoint with IAM-only access; restored by ADR-32: VPC endpoint only). Embeddings from Amazon Titan Text Embeddings V2 (1,024 dimensions). Knowledge Bases stays an optional later addition (for example for store policy questions).
+**Decision.** OpenSearch Serverless `VECTORSEARCH` collection, standby replicas off, access only through a VPC endpoint (amended by ADR-26 to the public endpoint with IAM-only access; restored by ADR-32: VPC endpoint only). Embeddings from Amazon Nova Multimodal Embeddings (1,024 dimensions; Amazon Titan Text Embeddings V2 until ADR-35). Knowledge Bases stays an optional later addition (for example for store policy questions).
 
 **Consequences.** Tool Lambdas and the curation job ran in the VPC (removed by ADR-26). Since ADR-32, only `search-catalog` and `catalog-index-writer` run in a VPC; the curation job stays outside it. OpenSearch is the second-largest running cost and is included in teardown guidance.
 
@@ -540,7 +540,7 @@ The AgentCore decider stacks, pool logic, measurement project and volume cleanup
 
 **Decision.** (a). The host starts `search_catalog` once the partial user transcript has been stable for 250 ms (or on the first delta after speech ends). On the final transcript it reuses that result only if the normalized query is identical; otherwise it cancels the speculative search and searches again. Partial transcripts never commit chips, call the decider or touch the shelf. Goals become: first UI ≤ 1.1 s, shelf ≤ 1.3 s, pointing ≤ 1.2 s, all from the end of speech.
 
-**Consequences.** Some extra `search_catalog` calls when the final transcript differs from the partial (the cost of a wasted Lambda + Titan + kNN call). The turn pipeline needs cancellation for superseded speculative searches. A speculative miss costs ~260 ms on that turn. `ui.debug` records whether retrieval was speculative, so the hit rate can be measured.
+**Consequences.** Some extra `search_catalog` calls when the final transcript differs from the partial (the cost of a wasted Lambda + embedding + kNN call). The turn pipeline needs cancellation for superseded speculative searches. A speculative miss costs ~260 ms on that turn. `ui.debug` records whether retrieval was speculative, so the hit rate can be measured.
 
 **Evidence.** docs/research.md "Nova 2.5 Sonic"; `backend/agentcore-runtime/scripts/sonic-check.py`.
 
@@ -646,7 +646,7 @@ A public sample cannot ship that data, and it cannot ask every deployer to downl
 - **Loader.** One CodeBuild job, `VoiceShop-CatalogCuration`, with no VPC and no source bucket: the `catalog-data` package itself is the job's source, uploaded as a CDK asset. `curate.py`:
   1. checks the zip against the lock file;
   2. validates each row and uploads its image to `products/<asin>/image.webp` in the private images bucket;
-  3. embeds each product with Titan Text Embeddings V2;
+  3. embeds each product with Amazon Nova Multimodal Embeddings: its words and its photo, averaged (ADR-35);
   4. rebuilds the `products` search index (ADR-20's rebuild-on-each-run rule still holds);
   5. writes `VoiceShop-Products` and `CATALOG#META`: departments with their categories, and option descriptions from the taxonomy;
   6. removes products and images that are no longer in the catalog.
@@ -856,3 +856,35 @@ A public sample cannot ship that data, and it cannot ask every deployer to downl
 **Consequences.** One more decider call when a removal names a line, and one more Lambda behind Gateway. `cart_item` needs a labeled set before its threshold leaves provisional. A shelf of more than 12 items arrives in several frames, and the frontend appends them in order.
 
 **Evidence.** `backend/agentcore-runtime/agent/turn_pipeline.py` (`_show_more`, `_remove_from_cart`), `questions.py` (`cart_item_question`, `pointing_text`), `policy.py`, `ui_events.py` (`frames`), `agent/calibration.json`; `backend/backend-infrastructure/lambda/remove-from-cart/index.js`; `frontend/src/state/useShopSession.ts`, `components/AssistantPanel.tsx`.
+
+#### ADR-35: Search the catalog on words and pictures, with Amazon Nova Multimodal Embeddings
+
+**Status.** Accepted 2026-11-13. Replaces the embedding model chosen in ADR-8.
+
+**Context.** Until now every product was indexed from its text alone (title, brand, department, category, gender, color, material and its first three features), embedded with Amazon Titan Text Embeddings V2. A shopper who says "the blue one" or "the one with the black lining" is describing what they can see, so those turns only worked when the words happened to repeat what the photo shows. A reviewer raised this directly: the catalog is written by a generator, so its descriptions are unusually complete, and a real store's are not.
+
+Amazon Nova Multimodal Embeddings puts text and images in one space, so a spoken query can be matched against a photo. It embeds one modality per call and returns unit vectors.
+
+**Options.**
+
+| Option | For | Against |
+|---|---|---|
+| Keep Titan Text Embeddings V2 | Already measured; one call per product | A visual request only works when the words repeat the picture |
+| Nova, text only | One call per product; one space for later image work | Measured no better than Titan, and ranked slightly worse |
+| Nova, image only | Best hit rate on visual requests | Loses brand, material and price words that text carries, and ranks ordinary requests worse |
+| **Nova, words and picture averaged** | Best on both: the visual hit rate of the picture and the ranking of the words | Two calls per product when the catalog is loaded |
+
+**Decision.** Index each product as the average of its text embedding and its image embedding, both `GENERIC_INDEX`, scaled back to length 1 because the index searches by inner product. Embed each shopper query once as text with `GENERIC_RETRIEVAL`. Keep 1,024 dimensions, so the index mapping does not change. A product whose photo cannot be embedded is skipped rather than indexed on its words alone, so every vector in the index is built the same way.
+
+**Evidence.** Measured on the shipped 2,500-product catalog, 29 queries that name something visible (colour, material, pattern, shape) and 40 ordinary shopper phrasings taken from the labeled evaluation. Hit rate is whether a correct product is in the top 6; MRR is where the first correct one ranks.
+
+| Index | Visual hit@6 | Visual MRR | Ordinary hit@6 | Ordinary MRR |
+|---|---|---|---|---|
+| Titan Text Embeddings V2 | 93.1% | 0.836 | 100% | 0.950 |
+| Nova, text only | 93.1% | 0.790 | 100% | 0.942 |
+| Nova, image only | 96.6% | 0.805 | 100% | 0.925 |
+| **Nova, words and picture averaged** | **96.6%** | **0.851** | 100% | 0.942 |
+
+Query embedding latency was unchanged: Titan 838 ms median and 1,051 ms at p95, Nova 886 ms and 943 ms. The catalog load makes two embedding calls per product instead of one; loading all 2,500 took about two minutes either way.
+
+**Consequences.** The catalog loader reads each image once, for the upload and the embedding, and holds about 25 MB of image bytes while it runs. The `search_catalog` Lambda function and the loader both need `bedrock:InvokeModel` on the Nova model, and the Bedrock VPC endpoint policy names it. Changing the embedding model re-embeds the whole catalog, so the index is rebuilt on the next load, which ADR-20 already does on every run. Resolving "the one with the black lining" among the items already on screen is a separate problem from search, and is not solved here.

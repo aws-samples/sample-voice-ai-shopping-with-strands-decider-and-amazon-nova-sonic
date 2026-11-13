@@ -52,7 +52,7 @@ export class NetworkStack extends cdk.Stack {
                   `arn:${cdk.Aws.PARTITION}:s3:::voiceshop-images-${cdk.Aws.ACCOUNT_ID}-${cdk.Aws.REGION}/*`],
     }));
 
-    // search-catalog embeds the shopper's query with Titan Text Embeddings V2.
+    // search-catalog embeds the shopper's query with Amazon Nova Multimodal Embeddings.
     const bedrockEndpoint = this.vpc.addInterfaceEndpoint('BedrockRuntimeEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
@@ -62,7 +62,7 @@ export class NetworkStack extends cdk.Stack {
     bedrockEndpoint.addToPolicy(new iam.PolicyStatement({
       principals: [new iam.AnyPrincipal()],
       actions: ['bedrock:InvokeModel'],
-      resources: [`arn:${cdk.Aws.PARTITION}:bedrock:${cdk.Aws.REGION}::foundation-model/amazon.titan-embed-text-v2:0`],
+      resources: [`arn:${cdk.Aws.PARTITION}:bedrock:${cdk.Aws.REGION}::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0`],
     }));
     NagSuppressions.addResourceSuppressions(bedrockEndpoint, [{
       id: 'CdkNagValidationFailure',

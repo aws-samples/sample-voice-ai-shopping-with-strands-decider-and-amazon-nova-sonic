@@ -223,7 +223,7 @@ class TurnPipeline:
         ms = (time.perf_counter() - started) * 1000
         filters_text = ', '.join(f'{k}={v}' for k, v in args.items() if k not in ('query', 'limit', 'availableOnly')) or 'none'
         await self._activity('search', 'Started searching early, while you were still speaking' if early else
-                             'Searched the catalog: Titan Text Embeddings V2 + OpenSearch Serverless (private, through the VPC)',
+                             'Searched the catalog: Nova Multimodal Embeddings + OpenSearch Serverless (private, through the VPC)',
                              f"\"{str(args.get('query', ''))[:70]}\" · filters: {filters_text} · "
                              f"{result.get('totalMatched', len(result.get('hits', [])))} matches", ms,
                              turn=self.state.turn_seq + 1 if early else None)
