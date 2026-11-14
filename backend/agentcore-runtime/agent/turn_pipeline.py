@@ -318,9 +318,16 @@ class TurnPipeline:
         intent_text = questions.intent_state_text(state, text)
         offer_text = questions.offer_reply_text(state, text) if state.pending_offer else None
         recheck_ids = questions.recheck_ids(state, parsed_budget)
-        recheck_q = questions.understand_questions(state, [i for i in recheck_ids if i != 'recipient'], deps.catalog)
+        # Each re-check hides the chips it asks about, so a changed answer is not read against
+        # its own previous one: the recipient on its own, the department and category together
+        # (the category chip implies its department), the rest with every chip in view.
+        place_ids = [i for i in recheck_ids if i in ('department', 'category')]
+        recheck_q = questions.understand_questions(
+            state, [i for i in recheck_ids if i not in ('recipient', 'department', 'category')], deps.catalog)
+        place_q = questions.understand_questions(state, place_ids, deps.catalog) if place_ids else {}
         recipient_q = questions.understand_questions(state, ['recipient'], deps.catalog) if 'recipient' in recheck_ids else {}
         recheck_text = questions.recheck_text(state, text)
+        place_text = questions.place_recheck_text(state, text)
         recipient_text = questions.recipient_recheck_text(state, text)
         recheck: dict[str, policy.Answer] = {}
         state_text = questions.state_text(state, text)
@@ -335,6 +342,7 @@ class TurnPipeline:
             calls = [self._ask('intent', intent_text, intent_q)] + ([self._ask('details', state_text, understand_q)] if understand_q else []) \
                 + ([self._ask('reply', offer_text, questions.offer_reply_question())] if offer_text else [])
             checks = ([self._ask('recheck', recheck_text, recheck_q)] if recheck_q else []) \
+                + ([self._ask('recheck_place', place_text, place_q)] if place_q else []) \
                 + ([self._ask('recheck_person', recipient_text, recipient_q)] if recipient_q else [])
             results = await asyncio.gather(*calls, *checks)
             recheck = {k: v for r in results[len(calls):] for k, v in r.answers.items()}

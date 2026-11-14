@@ -2,8 +2,8 @@ import pytest
 
 from filters import Budget
 from questions import (Catalog, MAX_OPTIONS, NONE_OF_THESE, best_fit_question,
-                       pointed_item_question, recheck_ids, recheck_text, select_understand, state_text,
-                       understand_questions)
+                       place_recheck_text, pointed_item_question, recheck_ids, recheck_text,
+                       recipient_recheck_text, select_understand, state_text, understand_questions)
 from state import Commit, SessionState
 
 
@@ -38,6 +38,25 @@ def test_committed_slots_are_rechecked_with_only_the_latest_sentence():
     assert recheck_ids(state, None) == ['recipient', 'gender', 'department']   # a stated amount is parsed, not re-asked
     text = recheck_text(state, 'something for my wife')
     assert 'something for my wife' in text and 'a gift for my brother' not in text and 'recipient=brother' in text
+
+
+def test_each_recheck_hides_the_chips_it_asks_about():
+    """A slot shown its own answer agrees with it, so "a gold watch" never left the sneaker
+    shelf while Shoes and Sneakers were in the context. Each re-check hides its own chips and
+    keeps the others, so the sentence is read fresh but still in context."""
+    state = SessionState(session_id='s', recipient=Commit('mother', 0.85), gender=Commit('women', 0.85, 'recipient'),
+                         department=Commit('Shoes', 0.49), category=Commit('Sneakers', 0.85),
+                         transcripts=['white sneakers'])
+    place = place_recheck_text(state, 'a gold watch')
+    assert 'department=' not in place and 'category=' not in place   # neither is read back to the model
+    assert 'recipient=mother' in place and 'a gold watch' in place   # the rest of the context stays
+
+    person = recipient_recheck_text(state, 'now something for my dad')
+    assert 'recipient=' not in person
+    assert 'department=Shoes' in person and 'category=Sneakers' in person
+
+    # The slots asked with every chip in view are the ones no re-check hides.
+    assert [i for i in recheck_ids(state, None) if i not in ('recipient', 'department', 'category')] == ['gender']
 
 
 def test_remembered_stays_out_of_the_understand_round():

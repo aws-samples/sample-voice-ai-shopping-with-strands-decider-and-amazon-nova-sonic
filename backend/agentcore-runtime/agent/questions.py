@@ -174,15 +174,37 @@ def recheck_ids(state: SessionState, parsed_budget: Budget | None) -> list[str]:
     return ids
 
 
+def _recheck_text_without(state: SessionState, transcript: str, slots: tuple[str, ...]) -> str:
+    """The latest sentence and the chips, minus the chips being re-asked: a slot shown its
+    own answer tends to agree with it, so a change of mind is only visible without it."""
+    hidden = SessionState.from_dict(state.to_dict())
+    for slot in slots:
+        setattr(hidden, slot, None)
+    return state_text(hidden, transcript, earlier=False)
+
+
 def recipient_recheck_text(state: SessionState, transcript: str) -> str:
     """The recipient re-check: the latest sentence and every chip except the recipient's
     own. With "For: Father" in the context, "now i want to purchase some gift for my mom"
     scored father 0.37 (mother 0.31); without it, mother 0.78. On 20 sentences: 20 right,
     no false change (pronoun sentences such as "he likes blue" answer not mentioned);
     with the chip, 3 missed (live endpoint, 2026-10-20)."""
-    hidden = SessionState.from_dict(state.to_dict())
-    hidden.recipient = None
-    return state_text(hidden, transcript, earlier=False)
+    return _recheck_text_without(state, transcript, ('recipient',))
+
+
+def place_recheck_text(state: SessionState, transcript: str) -> str:
+    """The department and category re-check: the latest sentence and every chip except
+    those two. Both are hidden together, because the category chip implies its department.
+
+    With "Department: Shoes" and "Category: Sneakers" in the context, "a gold watch" scored
+    Shoes 0.35 and never left the sneaker shelf; without them, Jewelry & Watches 0.87. On 12
+    sentences from that shelf: the 2 that name another department changed it (0.85, 0.88),
+    the 2 that name another category changed only that ("boots" 0.81, "sandals" 0.88, both
+    keeping Shoes), and the 7 that name neither answered not mentioned ("show me more",
+    "the blue ones", "number three", "scroll down", "add it to my cart", "yes", and a
+    sentence about a pattern rather than a place). "white sneakers" re-answered the chips it
+    already had (live endpoint, 2026-11-13)."""
+    return _recheck_text_without(state, transcript, ('department', 'category'))
 
 
 def recheck_text(state: SessionState, transcript: str) -> str:
