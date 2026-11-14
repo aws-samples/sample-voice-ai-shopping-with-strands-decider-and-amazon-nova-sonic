@@ -575,6 +575,7 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **One action per sentence.** Each sentence gets one intent: "close this one and open number nine" only closes.
 - **Speech that is not for the store.** The microphone hears everything in the room; a TV or another conversation can become a shopping sentence. Turn the mic off when you are not shopping.
 - **Budget phrasing.** Amounts are parsed in code ("under 80 dollars", "between 20 and 40"). Unusual phrasings can be missed or misread; the budget always appears as a chip you can remove.
+- **Something the store does not sell.** Searching on pictures as well as words (ADR-35) means the closest items for an absent request look more plausible, for example a wool scarf for "a silk tie". The store is then slightly more likely to show those closest items than to say that nothing matches exactly. Either way the shopper sees what arrived, and the shelf count tells them how many matched.
 - **Fair use under load.** A shopper sending more than 20 sentences a minute is held back, and the decider's queue is capped, so it is never overloaded. With one decider instance (the default), several shoppers talking at once can still see "Busy"; raise `deciderMaxInstances` for more concurrent shoppers.
 - **Two tabs on one session.** Each tab keeps its own view of the cart. A change in one tab can make the other say "That is already in your cart" or "Your cart changed"; nothing is added twice.
 
