@@ -49,29 +49,43 @@ class Thresholds:
     ask: float = 0.5
     no_match: float = DEFAULT_NO_MATCH
     per_question: dict = field(default_factory=dict)   # question id -> (act, ask)
+    # question id -> the confidence needed to REPLACE a committed chip, where that is more
+    # than the act threshold for setting an empty slot (ADR-36). Falls back to act.
+    per_question_change: dict = field(default_factory=dict)
 
     def __post_init__(self):
         for name, (act, ask) in {'default': (self.act, self.ask), **self.per_question}.items():
             if not (0 < ask < act <= 1):
                 raise ValueError(f'{name}: thresholds must satisfy 0 < ask < act <= 1 (ask={ask}, act={act})')
+        for name, change in self.per_question_change.items():
+            if not (self.for_question(name)[0] <= change <= 1):
+                raise ValueError(f'{name}: change threshold must be between its act threshold and 1 (got {change})')
         if not (0 < self.no_match < 1):
             raise ValueError(f'NO_MATCH_THRESHOLD must be in (0, 1), got {self.no_match}')
 
     @classmethod
     def from_env(cls, calibration_file: str = CALIBRATION_FILE) -> 'Thresholds':
-        per_question = {}
+        per_question, per_question_change = {}, {}
         no_match = str(DEFAULT_NO_MATCH)
         if os.path.exists(calibration_file):
             with open(calibration_file, encoding='utf-8') as f:
                 calibration = json.load(f)
             for qid, values in calibration.get('questions', {}).items():
                 per_question[qid] = (float(values['act']), float(values['ask']))
+                if values.get('change') is not None:
+                    per_question_change[qid] = float(values['change'])
             no_match = str(calibration.get('noMatch', {}).get('threshold', no_match))
         return cls(act=float(os.environ.get('ACT_THRESHOLD', '0.8')), ask=float(os.environ.get('ASK_THRESHOLD', '0.5')),
-                   no_match=float(os.environ.get('NO_MATCH_THRESHOLD', no_match)), per_question=per_question)
+                   no_match=float(os.environ.get('NO_MATCH_THRESHOLD', no_match)), per_question=per_question,
+                   per_question_change=per_question_change)
 
     def for_question(self, question_id: str | None) -> tuple[float, float]:
         return self.per_question.get(question_id or '', (self.act, self.ask))
+
+    def change_act(self, question_id: str | None) -> float:
+        """The confidence needed to replace a chip the shopper already has, which is at least
+        the act threshold for setting an empty one (ADR-36)."""
+        return self.per_question_change.get(question_id or '', self.for_question(question_id)[0])
 
     def band(self, confidence: float | None, question_id: str | None = None) -> str:
         """Total and monotonic per question: every confidence maps to exactly one band."""
@@ -270,12 +284,16 @@ def reset_for_new_person(state: SessionState) -> None:
 def changed_slots(state: SessionState, answers: dict[str, Answer], thresholds: Thresholds) -> dict[str, Answer]:
     """The re-checked committed slots (recheck_ids) whose confident answer differs
     from the chip. A changed department drops the category answer: that category
-    belongs to the old department, and the category round asks again."""
+    belongs to the old department, and the category round asks again.
+
+    Replacing a chip takes more confidence than setting an empty slot (change_act,
+    ADR-36): throwing away something the shopper established is the bigger action."""
     changes = {}
     for qid, answer in answers.items():
         slot = 'budget' if qid == 'budget_band' else qid
         commit = state.committed(slot)
-        if commit is None or answer.choice in (None, NOT_MENTIONED) or thresholds.band(answer.confidence, qid) != 'act':
+        if commit is None or answer.choice in (None, NOT_MENTIONED) \
+                or (answer.confidence or 0.0) < thresholds.change_act(qid):
             continue
         value = BUDGET_BANDS[answer.choice].label() if qid == 'budget_band' and answer.choice in BUDGET_BANDS else answer.choice
         if value != commit.value:
@@ -284,7 +302,18 @@ def changed_slots(state: SessionState, answers: dict[str, Answer], thresholds: T
         return {'recipient': changes['recipient']}   # the other chips are reset, not changed
     if 'department' in changes:
         changes.pop('category', None)
+    elif _wanted_another_department(state, answers):
+        # The department and category are read together, and a category belongs to its
+        # department: when the sentence pointed at another department but not confidently
+        # enough to move (change_act), its category answer cannot be committed either.
+        changes.pop('category', None)
     return changes
+
+
+def _wanted_another_department(state: SessionState, answers: dict[str, Answer]) -> bool:
+    answer, commit = answers.get('department'), state.committed('department')
+    return bool(answer and commit and answer.choice not in (None, NOT_MENTIONED)
+                and answer.choice != commit.value)
 
 
 def unsure_change(state: SessionState, answers: dict[str, Answer], thresholds: Thresholds) -> tuple[str, str] | None:

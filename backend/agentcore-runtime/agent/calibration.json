@@ -20,7 +20,9 @@
     "category": {
       "act": 0.55,
       "ask": 0.35,
-      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): at 0.55 tuning 1.000 / 0.864, held-out 1.000 / 0.857; one wrong commit at 0.52 (\"make it a skirt instead\" -> Jeans). At the old 0.85: recall 0.455."
+      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): at 0.55 tuning 1.000 / 0.864, held-out 1.000 / 0.857; one wrong commit at 0.52 (\"make it a skirt instead\" -> Jeans). At the old 0.85: recall 0.455.",
+      "change": 0.55,
+      "changeMeasured": "Same as the act threshold (0.55), stated so the rule is visible: no category change below 0.58 was right in the 2026-11-13 run."
     },
     "budget_band": {
       "act": 0.65,
@@ -35,7 +37,9 @@
     "department": {
       "act": 0.4,
       "ask": 0.25,
-      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): no wrong commit at any threshold (56 answers); at 0.40 tuning 1.000 / 0.794, held-out 1.000 / 0.733 (at 0.60: recall 0.53 / 0.47)."
+      "measured": "eval/catalog (116 scenarios on the synthetic catalog, 2026-10-19; tuning / held-out): no wrong commit at any threshold (56 answers); at 0.40 tuning 1.000 / 0.794, held-out 1.000 / 0.733 (at 0.60: recall 0.53 / 0.47).",
+      "change": 0.55,
+      "changeMeasured": "Replacing a committed department needs 0.55, not the 0.40 act threshold (ADR-36). eval/catalog on the Nova catalog, 2026-11-13: of the 12 department/category changes the re-check committed across the 221 turns, the only wrong one was \"for women, size does not matter\" after \"running shoes for me\" (Women's Clothing 0.50, replacing Shoes 0.79); every right one scored 0.58 or more. At 0.55: 11 of 11 right changes kept, the wrong one blocked. At 0.60 one right change is lost (\"actually make it a skirt instead\", 0.58)."
     },
     "offer_reply": {
       "act": 0.65,

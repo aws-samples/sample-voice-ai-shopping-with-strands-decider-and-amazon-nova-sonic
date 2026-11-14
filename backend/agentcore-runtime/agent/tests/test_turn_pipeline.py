@@ -608,20 +608,28 @@ def test_a_new_person_resets_the_other_chips():
 
 
 def test_a_new_department_clears_the_category_and_asks_within_it():
-    """'What about some t shirts' while in Bags & Accessories kept showing bags (live session)."""
+    """'What about some t shirts' while in Bags & Accessories kept showing bags (live session).
+
+    0.76 is what a sentence like this scores now that the re-check hides the chip it asks about
+    (ADR-36: "can you show me some t shirts" 0.76, "no reset the category ..." 0.74 on the
+    2026-11-13 run). It used to answer around 0.47, read against its own previous answer."""
     from state import Commit
-    async def go():
+    async def go(confidence):
         p, _, decider, _ = make({'intent': ans('intent', 'narrowing', 0.9),
-                                 'department': ans('department', 'Jewelry & Watches', 0.47),
+                                 'department': ans('department', 'Jewelry & Watches', confidence),
                                  'category': ans('category', 'Watches', 0.9)})
         p.state.department = Commit('Bags & Accessories', 0.62)
         p.state.category = Commit('Handbags', 0.9)
         await p.on_final('what about a watch')
         return p, decider
-    p, decider = run(go())
+    p, decider = run(go(0.76))
     assert p.state.department.value == 'Jewelry & Watches' and p.state.category.value == 'Watches'
     # the category was asked again, within the new department
     assert any(qs == ['category'] and 'department=Jewelry & Watches' in text for text, qs in decider.calls)
+
+    # Below the change threshold the shelf keeps the chips the shopper already has (ADR-36).
+    p, _ = run(go(0.50))
+    assert p.state.department.value == 'Bags & Accessories' and p.state.category.value == 'Handbags'
 
 
 def test_a_confident_place_order_still_asks_first():

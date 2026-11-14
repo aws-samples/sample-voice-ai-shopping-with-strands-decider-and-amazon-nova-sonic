@@ -1,8 +1,9 @@
 import pytest
 
 from filters import Budget
-from policy import (Answer, Thresholds, apply_commits, chips, no_match, plan_understand, rank_by_best_fit,
-                    why_this_pick)
+import policy
+from policy import (Answer, Thresholds, apply_commits, changed_slots, chips, no_match, plan_understand,
+                    rank_by_best_fit, why_this_pick)
 from state import Commit, SessionState
 
 T = Thresholds()                 # the design's flat 0.8 / 0.5
@@ -152,3 +153,26 @@ def test_why_this_pick():
 def test_without_calibration_json_no_match_falls_back_to_the_measured_value(tmp_path):
     from policy import Thresholds
     assert Thresholds.from_env(str(tmp_path / 'missing.json')).no_match == 0.35
+
+def test_replacing_a_chip_needs_more_confidence_than_setting_one():
+    """ADR-36: "for women, size does not matter" answered Women's Clothing 0.50, over the 0.40
+    act threshold, and threw away a Shoes chip committed at 0.79. A change needs 0.55."""
+    thresholds = policy.Thresholds(act=0.8, ask=0.5,
+                                   per_question={'department': (0.4, 0.25)},
+                                   per_question_change={'department': 0.55})
+    state = SessionState(session_id='s', department=policy.Commit(value='Shoes', confidence=0.79))
+
+    too_unsure = {'department': policy.Answer(question_id='department', choice="Women's Clothing", confidence=0.50)}
+    assert policy.changed_slots(state, too_unsure, thresholds) == {}
+
+    confident = {'department': policy.Answer(question_id='department', choice="Women's Clothing", confidence=0.58)}
+    assert list(policy.changed_slots(state, confident, thresholds)) == ['department']
+
+    # An empty slot still commits on the lower act threshold, unchanged.
+    assert thresholds.band(0.50, 'department') == 'act'
+
+
+def test_a_change_threshold_below_its_act_threshold_is_rejected():
+    with pytest.raises(ValueError, match='change threshold'):
+        policy.Thresholds(act=0.8, ask=0.5, per_question={'department': (0.4, 0.25)},
+                          per_question_change={'department': 0.3})
