@@ -74,11 +74,15 @@ exports.handler = async (event) => {
     indexed += (result.items || []).length;
   }
 
-  // Serverless collections make new documents searchable after a short delay.
+  // Serverless collections make new documents searchable after a short delay. A just-created
+  // index can also answer 404 to _count for a moment after the bulk load has succeeded
+  // (seen 2026-11-14), so 404 means "not searchable yet", like a low count.
   let searchable = 0;
   const deadline = Date.now() + REFRESH_WAIT_MS;
   while (Date.now() < deadline) {
-    searchable = (await aossRequest('POST', `/${INDEX}/_count`, { query: { match_all: {} } })).count || 0;
+    const { status, body } = await aossRequest('POST', `/${INDEX}/_count`, { query: { match_all: {} } },
+      { okStatuses: [200, 404] });
+    searchable = status === 200 ? (body && body.count) || 0 : 0;
     if (searchable >= indexed) break;
     await new Promise((resolve) => setTimeout(resolve, 10_000));
   }
