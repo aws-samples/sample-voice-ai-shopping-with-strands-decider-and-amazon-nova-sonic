@@ -185,6 +185,8 @@ def test_parent_without_gender_asks_mom_or_dad():
     outcome, sent = run(go())
     assert outcome['directive'] == 'ask' and outcome['say'] == 'Is that your mom or your dad?'
     assert of(sent, 'ui.status')[-1] == {'type': 'ui.status', 'kind': 'clarifying', 'message': 'Is that your mom or your dad?'}
+    # Spoken even with spoken replies off: it is a question to the shopper (owner, 2026-11-15).
+    assert outcome['speak'] is True
 
 
 def test_no_match_keeps_the_closest_items_and_offers_to_widen():

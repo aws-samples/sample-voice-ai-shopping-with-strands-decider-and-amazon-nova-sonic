@@ -526,6 +526,8 @@ The AgentCore decider stacks, pool logic, measurement project and volume cleanup
 
 **Amendment (2026-10-19).** Yes/no confirmations are spoken even when replies are off: "Do you mean No. N, ...?" (ADR-28), the widen offer after a no-match (ADR-29), the order offer (always asked first, ADR-31), and the offer an unsure `go_back`, `start_over` or `confirm` turns into. The host decides per turn whether audio reaches the browser. The header toggle reads "Voice on" or "Voice off".
 
+**Amendment (2026-11-15).** A narrowing turn's clarifying question, such as "Is that your mom or your dad?", is spoken even when replies are off. It had stayed on screen as an optional follow-up, because the shelf already shows results; in practice a silent question is easy to miss, and the point of asking is that the shopper hears it. With this, every question the app puts to the shopper is spoken, and statements about the shelf stay on screen. The cost is a few more spoken lines per session, only on turns that ask.
+
 **Evidence.** Design review of the frontend, 2026-10-18.
 
 ---

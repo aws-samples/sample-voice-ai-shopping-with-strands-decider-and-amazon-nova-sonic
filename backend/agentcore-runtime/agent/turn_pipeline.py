@@ -460,19 +460,17 @@ class TurnPipeline:
                             for c in policy.chips(state)]
         # A clarifying question belongs to a narrowing turn and never replaces a
         # yes/no question, a no-match offer or an error.
-        clarifying = False
         if plan.clarify and plan.intent == 'narrowing' and not outcome.get('confirmation') \
                 and outcome['directive'] not in ('no_match', 'error'):
             outcome['directive'], outcome['say'] = 'ask', plan.clarify
-            clarifying = not decider_down   # an optional follow-up; "please say it again" is not
             metrics.emit('ClarifyingQuestions', 1)
             await deps.send(ui_events.status('clarifying', plan.clarify))
-        # Visual-first (ADR-23): speak when spoken replies are on, and for every question the turn
-        # waits on: yes/no confirmations (design decision 2026-10-18) and other asks, such as
-        # which card the shopper means (owner, 2026-10-25). A narrowing turn's optional follow-up
-        # question stays on screen.
+        # Visual-first (ADR-23): speak when spoken replies are on, and for every question to the
+        # shopper: yes/no confirmations (design decision 2026-10-18), which card they mean (owner,
+        # 2026-10-25) and the one clarifying question of a narrowing turn ("Is that your mom or
+        # your dad?"; owner, 2026-11-15). Statements about the shelf stay on screen.
         outcome['speak'] = self.voice_replies or bool(outcome.get('confirmation')) \
-            or (outcome['directive'] == 'ask' and not clarifying)
+            or outcome['directive'] == 'ask'
         if outcome.get('say'):
             await deps.send(ui_events.reply(turn, outcome['say']))
         if state.pending_offer:
