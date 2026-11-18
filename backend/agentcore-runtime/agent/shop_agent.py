@@ -252,6 +252,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         state.pending_offer = None
                     elif kind == 'ui.voice_replies':
                         pipeline.voice_replies = message['enabled']
+                        logger.info('🔊 spoken replies %s', 'on' if message['enabled'] else 'off')
             finally:
                 # The session ends here, in one order: no new input (the Sonic stream), then the
                 # turns (a cart write in progress finishes), all before the Gateway connection
