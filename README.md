@@ -28,7 +28,7 @@
 
 This sample demonstrates how to build a visual-first voice shopping assistant that is driven by a decision model. The shopper sees a shelf of numbered products and talks or types: "a gift for my mom under eighty dollars", "show me watches", "number 3", "add it to my cart". Each sentence becomes a few typed questions (what the shopper wants to do, who the item is for, which department and category, what budget, which card). **Strands Decider 2B** answers each question with calibrated per-option probabilities. Code then applies the hard rules (budget, department, category, gender, availability). The assistant acts when the decider is sure, asks one short question when it is not, and always confirms before it places an order. The sample addresses a common problem with voice commerce: a general-purpose model that guesses quietly when it is unsure, which leads to wrong filters, wrong items in the cart, and lost trust.
 
-The sample uses **Strands Decider 2B** on an **Amazon SageMaker AI** real-time endpoint for decisions, and **Amazon Bedrock AgentCore Runtime** to host one isolated session per shopper. **Amazon Nova 2.5 Sonic** handles speech in and, optionally, speech out, and the **Strands Agents** framework (`BidiAgent`) connects it to the session. **Amazon Bedrock AgentCore Gateway** exposes the tools over the **Model Context Protocol (MCP)**. **Amazon OpenSearch Serverless** with **Amazon Nova Multimodal Embeddings** runs private vector search over each product's words and photo. **Amazon DynamoDB** stores products, sessions, carts and orders. All infrastructure is deployed with the **AWS Cloud Development Kit (AWS CDK)**. The product catalog (about 2,500 products with photos) was generated for this sample with models on Amazon Bedrock, so it contains no third-party product data. This is a reference sample, not a production retail system: no payment is ever taken.
+The sample uses **Strands Decider 2B** on an **Amazon SageMaker AI** real-time endpoint for decisions, and **Amazon Bedrock AgentCore Runtime** to host one isolated session per shopper. **Amazon Nova 2.5 Sonic** handles speech in and speaks the questions and answers, and the **Strands Agents** framework (`BidiAgent`) connects it to the session. **Amazon Bedrock AgentCore Gateway** exposes the tools over the **Model Context Protocol (MCP)**. **Amazon OpenSearch Serverless** with **Amazon Nova Multimodal Embeddings** runs private vector search over each product's words and photo. **Amazon DynamoDB** stores products, sessions, carts and orders. All infrastructure is deployed with the **AWS Cloud Development Kit (AWS CDK)**. The product catalog (about 2,500 products with photos) was generated for this sample with models on Amazon Bedrock, so it contains no third-party product data. This is a reference sample, not a production retail system: no payment is ever taken.
 
 The architecture is split into six sections:
 
@@ -83,7 +83,7 @@ The turn pipeline is the session host code (`backend/agentcore-runtime/agent/tur
 1. Reuses the speculative search started on the partial transcript, or starts one.
 2. Asks Strands Decider 2B its typed questions in parallel: the intent, the open details, the reply to a pending yes/no question, and change-of-mind re-checks on the chips already set.
 3. Applies the policy: per-question thresholds turn each calibrated answer into act, show results and ask one question, or treat it as not said. Exact numbers, such as a budget, are parsed in code.
-4. Routes by intent (search, point at a card, confirm, remove, place the order, go back, start over, close, scroll, show more) and calls the tools through AgentCore Gateway, with every chip as a hard filter.
+4. Routes by intent (search, point at a card, answer a question about the open item, confirm, remove, place the order, go back, start over, close, scroll, show more) and calls the tools through AgentCore Gateway, with every chip as a hard filter.
 5. Updates the screen first (chips, shelf, product panel, cart), then sets the outcome that Nova 2.5 Sonic voices through its `get_turn_outcome` tool.
 6. Saves the session state and a turn record in DynamoDB.
 
@@ -379,8 +379,9 @@ After deployment and validation, open the store and shop by voice or text.
 3. Turn on the microphone and speak, or type in the search bar. Before a demo, say one or two sentences first: the first request after a deploy can take a few seconds.
 
 What you can do:
-- **Pointing.** Every card shows its number. Say "number 5", "the second one" or describe the item. When the assistant is unsure, it asks "Do you mean No. 5, ...?". Tapping a card always works.
+- **Pointing.** Every card shows its number. Say "number 5", "the second one", or describe it by colour or by a word in its name ("the black one", "the one with the wave on it"). When the assistant is unsure, it asks "Do you mean No. 5, ...?"; when two cards fit about equally, such as two black ones, it asks "Do you mean No. 2, ..., or No. 7, ...?". Tapping a card always works.
 - **Chips.** Committed choices appear as chips with their confidence. Click a chip to remove it. You can change your mind at any time ("actually it's for my dad"): a new recipient clears the earlier details.
+- **Questions about the open item.** With a card open, ask "what is it made of?", "how are the reviews?" or "is it in stock?". The answer is read from the product record and spoken ("It's made of leather."), the item stays open, and "yes" still adds it. A detail the record does not hold is said plainly rather than guessed.
 - **More results and moving around.** "Show me more" adds the next 12 results, up to 49. "Scroll down" and "back to the top" move the page. "Close it" closes the open product.
 - **No match.** The closest items stay on screen, and the assistant offers to drop one filter. Say "yes" to widen the search.
 - **Yes/no questions.** They show Yes and No buttons. If the browser already allows the microphone for the site, it opens by itself so you can answer by voice.
@@ -410,6 +411,11 @@ Shopper: Show me number three.
 
 Store:   [Decider: intent = pick an item 96%, pointed item = No. 3 94%]
          Opens No. 3, a silver pendant necklace, $64.
+
+Shopper: What is it made of?
+
+Store:   [Decider: intent = question about the open item 93%, detail = material 98%]
+         "It's made of sterling silver. Should I add it to your cart?" The panel stays open.
 
 Shopper: Yes, add it to my cart.
 
@@ -572,6 +578,8 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 - **Voice quality.** Real-time streaming needs a stable internet connection.
 - **One item at a time.** The cart adds one item per request. "Add items 1, 5 and 3" is not supported yet.
 - **Some ways of naming a card.** When the decider is unsure what a sentence wants, the store searches (the safe default). Phrasings such as "open number eight", "number three looks nice, add it" or "add another one" can land there. "Number eight", "I like number eight" and "add number three" are read reliably. Better coverage needs new intent option descriptions and a re-calibration with the evaluation, as described in docs/how-we-tuned-it.md.
+- **Pointing by appearance.** A card can be picked by its colour or a word in its name, because both are in the decider's options. A detail only the photo shows ("the one with the black lining") cannot be, and when three or more cards share a colour, the question names the two that fit best; say the number of the one you mean.
+- **Questions the record cannot answer.** A question about the open item is answered from its product record. A detail it does not hold, such as whether a bag has a zipper when that is not among its features, gets "I don't have that detail for this one."
 - **Comparisons in the cart.** "Remove the more expensive one" is not understood: the decider picks an item, not the result of a comparison. Every removal is asked first, so nothing goes wrong; name the item or tap × in the cart.
 - **One action per sentence.** Each sentence gets one intent: "close this one and open number nine" only closes.
 - **Speech that is not for the store.** The microphone hears everything in the room; a TV or another conversation can become a shopping sentence. Turn the mic off when you are not shopping.
@@ -607,6 +615,7 @@ For any feedback, questions, or suggestions, use the [Issues tab](https://github
 ## Revisions
 
 - **v1.0.0**: Initial release with Strands Decider 2B on Amazon SageMaker AI, Amazon Nova 2.5 Sonic, Amazon Bedrock AgentCore (Runtime, Gateway, Memory), private Amazon OpenSearch Serverless vector search, and a generated catalog.
+- **v1.1.0**: Catalog search on words and product photos with Amazon Nova Multimodal Embeddings, replacing Amazon Titan Text Embeddings V2 (ADR-35); questions about the open item answered from its product record (ADR-37); pointing at a card by colour or a word in its name, with a question when two cards fit equally (ADR-38); change-of-mind fixes for the department and category (ADR-36); every question to the shopper spoken, and the Voice toggle removed (ADR-23).
 
 ## Authors
 
