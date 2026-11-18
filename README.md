@@ -67,7 +67,7 @@ The numbers match the architecture diagram and follow one spoken sentence.
 1. The shopper opens the React web app on **AWS Amplify**, in a browser on a computer or phone.
 2. The app signs the shopper in with **Amazon Cognito**, which returns JWT tokens. The identity pool exchanges them for temporary AWS credentials that can only open the session host WebSocket.
 3. The browser opens a SigV4-signed WebSocket to the session host on **Amazon Bedrock AgentCore Runtime**, one microVM per shopping session. The host verifies the Cognito token in the first message; then the browser streams microphone audio, or sends typed text.
-4. **Amazon Nova 2.5 Sonic**, a speech-to-speech model on **Amazon Bedrock**, returns text transcripts of what the shopper said. A partial transcript starts a speculative catalog search, and the final transcript starts the turn. Sonic speaks the reply the app gives it, only when spoken replies are on or to ask the shopper a question.
+4. **Amazon Nova 2.5 Sonic**, a speech-to-speech model on **Amazon Bedrock**, returns text transcripts of what the shopper said. A partial transcript starts a speculative catalog search, and the final transcript starts the turn. Sonic speaks the reply the app gives it only when the reply is a question to the shopper or an answer about the open item; everything else is shown on screen.
 5. The session host sends typed questions to **Strands Decider 2B** on the **Amazon SageMaker AI** endpoint: the intent, who the item is for, the department, then the category within it, and which card the shopper means. Each answer comes with a calibrated confidence. Depending on that confidence, the code acts, shows results while asking one short question, or offers a yes/no choice. Budgets are parsed in code.
 6. The session host calls tools over MCP, with IAM authentication, through **Amazon Bedrock AgentCore Gateway**, which invokes five **AWS Lambda** functions. **Amazon Bedrock AgentCore Memory** keeps preferences for the next visit.
 7. The `search_catalog` Lambda function runs in an isolated VPC subnet. Through VPC endpoints, it embeds the shopper's query with **Amazon Nova Multimodal Embeddings** and runs a filtered vector search in **Amazon OpenSearch Serverless**.
@@ -97,7 +97,7 @@ We recommend creating a [Budget](https://docs.aws.amazon.com/cost-management/lat
 
 ### Sample Cost Table
 
-The following table shows a sample monthly cost breakdown for the default parameters in the US East (N. Virginia) Region. It assumes 3,000 shopping sessions per month, with spoken replies off (the default). The per-session usage of Nova 2.5 Sonic and AgentCore Runtime was measured in Amazon CloudWatch over 71 test sessions (October 2026, about 6 minutes of connection time each). The table does not account for AWS Free Tier benefits.
+The following table shows a sample monthly cost breakdown for the default parameters in the US East (N. Virginia) Region. It assumes 3,000 shopping sessions per month,. The per-session usage of Nova 2.5 Sonic and AgentCore Runtime was measured in Amazon CloudWatch over 71 test sessions (October 2026, about 6 minutes of connection time each). The table does not account for AWS Free Tier benefits.
 
 | AWS service | Dimensions | Cost [USD] |
 | ----------- | ---------- | ---------- |
@@ -120,8 +120,8 @@ The following table shows a sample monthly cost breakdown for the default parame
 
 **Notes:**
 - The decider endpoint is about 75% of the total. ml.g6.xlarge is the smallest full-GPU G6 instance SageMaker AI offers for a real-time endpoint. The fallback ml.g5.xlarge (`--decider-instance-type g5.xlarge`, $1.408/hour) costs about $1,028 per month instead of $822, with the same answers and latency in our tests.
-- Usage-based costs are small: about $78 of the total for 3,000 sessions, mostly Nova 2.5 Sonic and AgentCore Runtime memory time. Turning spoken replies on raises the Nova 2.5 Sonic output-token cost.
-- The measured sessions were test sessions with spoken replies off, so speech output covers only the questions to the shopper. Longer sessions, or spoken replies on, raise the Nova 2.5 Sonic and AgentCore Runtime costs.
+- Usage-based costs are small: about $78 of the total for 3,000 sessions, mostly Nova 2.5 Sonic and AgentCore Runtime memory time.
+- Speech output covers only the questions to the shopper and answers about the open item. Longer sessions raise the Nova 2.5 Sonic and AgentCore Runtime costs.
 - Each deploy also runs AWS CodeBuild jobs for the image builds and the catalog load (a few dollars per fresh deploy).
 - If you keep the decider image between deployments (`./cleanup-all.sh --keep-decider-image`), Amazon ECR storage costs about $1.35 per month. Nothing else runs or bills.
 
@@ -386,7 +386,7 @@ What you can do:
 - **Yes/no questions.** They show Yes and No buttons. If the browser already allows the microphone for the site, it opens by itself so you can answer by voice.
 - **Cart.** Say "add it to my cart". If the item is already in the cart, the assistant asks "Should I add another one?" first. Remove an item by voice ("remove the blouse from my cart") or with its ×. When the cart holds more than one of an item, "remove one" takes out one and keeps the rest, and "remove both" takes out the line. "Empty my cart" asks first.
 - **Orders.** "Place my order" always asks "Should I place the order?" first. If the cart is empty, the assistant says so. An order is a DynamoDB record, and nothing is charged.
-- **Voice on / Voice off.** Spoken replies are off by default, and the chat shows the reply text instead. The header toggle turns spoken replies on. Questions to the shopper (yes/no confirmations, which card they mean, and a clarifying question such as "Is that your mom or your dad?") are spoken either way.
+- **What is spoken.** The screen carries the results, so the chat shows the app's reply text. Every question to the shopper is spoken (yes/no confirmations, which card they mean, and a clarifying question such as "Is that your mom or your dad?"), and so is the answer to a question about the open item ("It's made of leather").
 - **Behind the scenes.** Press **D**, or use **Debug overlay** in the footer, to see each sentence's decider questions and answers, catalog searches, DynamoDB writes and timings. **Pop out** moves the panel to its own window, for example to keep it beside the store while you record.
 
 ### Example conversation

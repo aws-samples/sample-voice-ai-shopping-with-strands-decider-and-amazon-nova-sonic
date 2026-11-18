@@ -83,7 +83,7 @@ export type HostMessage =
   | { type: 'ui.shelf_append'; turnId: number; items: ShelfItem[] }
   /** A yes/no question is pending (Yes / No buttons; the mic opens when already permitted). */
   | { type: 'ui.question'; turnId: number; text: string }
-  /** The app's reply for the turn; the chat shows it while spoken replies are off. */
+  /** The app's reply for the turn; the chat shows it (ADR-23). */
   | { type: 'ui.reply'; turnId: number; text: string }
   | { type: 'ui.product_open'; turnId: number; product: ProductDetail; why: string; confidence?: number }
   | { type: 'ui.product_close'; turnId: number }
@@ -107,9 +107,7 @@ export type BrowserMessage =
   | { type: 'ui.chip_remove'; slot: Slot }
   | { type: 'ui.product_tap'; asin: string }
   | { type: 'ui.close_product' }
-  | { type: 'ui.cart_remove'; asin: string }
-  /** Visual-first (ADR-23): spoken replies are off unless the shopper turns them on. */
-  | { type: 'ui.voice_replies'; enabled: boolean };
+  | { type: 'ui.cart_remove'; asin: string };
 
 /** What the UI needs from a session (the AgentCore WebSocket). */
 export interface SessionTransport {

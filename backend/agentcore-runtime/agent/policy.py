@@ -116,7 +116,7 @@ class UnderstandPlan:
     context: dict[str, tuple[str, float]] = field(default_factory=dict)
     clarify: str | None = None
     liked: bool = False
-    # A yes/no confirmation question (spoken even when spoken replies are off, ADR-23).
+    # A yes/no confirmation question (always spoken, ADR-23).
     confirmation: bool = False
     # The action an 'ask_offer' turn offers ('place_order', 'go_back', 'start_over',
     # 'add_to_cart:<asin>', 'open:<asin>', 'widen:<slot>', 'switch:<slot>:<value>',

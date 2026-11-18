@@ -3,13 +3,13 @@
 (--url ws://127.0.0.1:8080/ws) or to the deployed AgentCore runtime (--runtime-arn,
 SigV4-presigned like the browser), plays scripted sentences as bidi_text_input,
 and prints what the shopper would see and hear for each turn. Audio chunks are
-counted, not played: with spoken replies off, only confirmation turns should
-carry audio (ADR-23).
+counted, not played: only turns that ask the shopper a question, or answer one
+about the open item, should carry audio (ADR-23).
 
 Usage:
     python3 text_client.py --credentials tester.json --url ws://127.0.0.1:8080/ws
     python3 text_client.py --credentials tester.json --runtime-arn arn:aws:bedrock-agentcore:...
-    [--voice-replies] [--say "a gift for my mom" --say "the second one" ...]
+    [--say "a gift for my mom" --say "the second one" ...]
 """
 
 import argparse
@@ -56,7 +56,6 @@ async def run(args) -> None:
     async with websockets.connect(url, additional_headers=headers, max_size=8 * 1024 * 1024) as ws:
         await ws.send(json.dumps({'type': 'auth', 'access_token': token}))
         await ws.send(json.dumps({'type': 'ui.layout', 'columns': 4}))
-        await ws.send(json.dumps({'type': 'ui.voice_replies', 'enabled': args.voice_replies}))
         await drain(ws, until=lambda m: m.get('type') == 'ui.status' and m.get('kind') in ('listening', 'error'), timeout=30, label='connect')
         for sentence in (args.say or DEFAULT_SCRIPT):
             if sentence.startswith('@wait '):   # e.g. --say "@wait 60": stay idle, as a reading shopper would
@@ -116,7 +115,6 @@ def main() -> None:
     parser.add_argument('--url')
     parser.add_argument('--runtime-arn')
     parser.add_argument('--region', default='us-east-1')
-    parser.add_argument('--voice-replies', action='store_true')
     parser.add_argument('--settle', type=float, default=4.0, help='seconds to keep listening after each turn for Sonic')
     parser.add_argument('--say', action='append')
     parser.add_argument('--debug', action='store_true', help='print the top decider answers per question')

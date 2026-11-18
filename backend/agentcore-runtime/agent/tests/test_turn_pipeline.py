@@ -185,7 +185,7 @@ def test_parent_without_gender_asks_mom_or_dad():
     outcome, sent = run(go())
     assert outcome['directive'] == 'ask' and outcome['say'] == 'Is that your mom or your dad?'
     assert of(sent, 'ui.status')[-1] == {'type': 'ui.status', 'kind': 'clarifying', 'message': 'Is that your mom or your dad?'}
-    # Spoken even with spoken replies off: it is a question to the shopper (owner, 2026-11-15).
+    # Spoken: it is a question to the shopper (owner, 2026-11-15).
     assert outcome['speak'] is True
 
 
@@ -742,7 +742,7 @@ def test_a_pending_offer_is_also_a_question_on_screen():
 
 
 def test_an_empty_cart_order_is_answered_in_words_on_screen():
-    """With spoken replies off, Sonic said 'Take a look.' and nothing on screen changed."""
+    """Sonic said 'Take a look.' (the reply is not spoken) and nothing on screen changed."""
     async def go():
         p, _, _, sent = make(MOM)
         await p.on_final('a gift for my mom')

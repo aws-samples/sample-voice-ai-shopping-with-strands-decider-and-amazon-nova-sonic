@@ -118,7 +118,6 @@ class TurnPipeline:
         self._spec: tuple[str, asyncio.Task] | None = None   # (key, search task)
         self._results: list[dict] = []     # every result of the latest search, in shelf order
         self._t0 = time.perf_counter()
-        self.voice_replies = False
         self.speak_current = False   # whether Sonic's reply to the latest turn is played
 
     # ------------------------------------------------------------- entry points
@@ -469,13 +468,11 @@ class TurnPipeline:
             outcome['directive'], outcome['say'] = 'ask', plan.clarify
             metrics.emit('ClarifyingQuestions', 1)
             await deps.send(ui_events.status('clarifying', plan.clarify))
-        # Visual-first (ADR-23): speak when spoken replies are on, and for every question to the
-        # shopper: yes/no confirmations (design decision 2026-10-18), which card they mean (owner,
+        # Visual-first (ADR-23): speak every question to the shopper: yes/no confirmations (design decision 2026-10-18), which card they mean (owner,
         # 2026-10-25) and the one clarifying question of a narrowing turn ("Is that your mom or
         # your dad?"; owner, 2026-11-15), and the answer to the shopper's own question about the
         # open item (ADR-37). Statements about the shelf stay on screen.
-        outcome['speak'] = self.voice_replies or bool(outcome.get('confirmation')) \
-            or outcome['directive'] in ('ask', 'answer')
+        outcome['speak'] = bool(outcome.get('confirmation')) or outcome['directive'] in ('ask', 'answer')
         if outcome.get('say'):
             await deps.send(ui_events.reply(turn, outcome['say']))
         if state.pending_offer:

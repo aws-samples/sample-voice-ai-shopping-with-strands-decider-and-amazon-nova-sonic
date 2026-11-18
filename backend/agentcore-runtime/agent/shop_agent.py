@@ -126,8 +126,6 @@ def valid(message: dict, state: SessionState) -> bool:
     if kind == 'ui.cart_remove':
         asin = message.get('asin')
         return isinstance(asin, str) and bool(ASIN.match(asin)) and any(i['asin'] == asin for i in state.cart.get('items', []))
-    if kind == 'ui.voice_replies':
-        return isinstance(message.get('enabled'), bool)
     return False
 
 
@@ -250,9 +248,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     elif kind == 'ui.close_product':
                         state.open_product = None
                         state.pending_offer = None
-                    elif kind == 'ui.voice_replies':
-                        pipeline.voice_replies = message['enabled']
-                        logger.info('🔊 spoken replies %s', 'on' if message['enabled'] else 'off')
             finally:
                 # The session ends here, in one order: no new input (the Sonic stream), then the
                 # turns (a cart write in progress finishes), all before the Gateway connection

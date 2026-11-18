@@ -66,8 +66,6 @@ export function ShopPage({ transport, userName, onSignOut }: ShopPageProps) {
         mic={state.mic}
         micLevel={state.micLevel}
         cartCount={state.cart.itemCount}
-        voiceReplies={state.voiceReplies}
-        onVoiceRepliesChange={session.setVoiceReplies}
         userName={userName}
         onMicToggle={state.mic === 'on' ? session.stopMic : session.startMic}
         onSendText={session.sendText}

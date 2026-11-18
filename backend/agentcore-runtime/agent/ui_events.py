@@ -35,7 +35,7 @@ def frames(message: dict) -> list[dict]:
 
 
 def reply(turn_id: int, text: str) -> dict:
-    """The app's own reply for the turn. With spoken replies off, the chat shows this
+    """The app's own reply for the turn. The chat shows this
     text: Sonic then answers in two or three words ("Take a look."), which said
     nothing when the screen did not change ("the cart is empty")."""
     return {'type': 'ui.reply', 'turnId': turn_id, 'text': text}

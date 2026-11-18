@@ -26,7 +26,7 @@ Each record gives the context, the options considered, the decision, its consequ
 | [ADR-20](#adr-20-catalog-eligibility-from-the-items-own-text) | Read color, material and gender from the item's own title/features when `details` lacks them; size optional; rebuild the search index on each curation run | Superseded by ADR-27 (index rebuild kept) |
 | [ADR-21](#adr-21-no_match-from-an-explicit-none-of-these-option) | `no_match` from an explicit `none_of_these` option in `best_fit`; product picks are ranked, never shown with a confidence | Accepted (what a no-match shows: ADR-29) |
 | [ADR-22](#adr-22-decider-on-a-sagemaker-real-time-endpoint) | Decider on a SageMaker real-time GPU endpoint with auto-scaling, replacing AgentCore Runtime Instances | Accepted |
-| [ADR-23](#adr-23-visual-first-spoken-replies-optional) | Visual-first: Sonic always listens, spoken replies off by default behind a toggle | Accepted |
+| [ADR-23](#adr-23-visual-first-spoken-replies-optional) | Visual-first: Sonic always listens; only questions to the shopper and answers about the open item are spoken | Accepted |
 | [ADR-24](#adr-24-speculative-retrieval-on-partial-transcripts) | Start catalog search on stable partial transcripts; re-budget first UI to 1.1 s | Accepted |
 | [ADR-25](#adr-25-catalog-updates-checked-with-the-decider-before-publishing) | Production catalog updates: image model fills the metadata schema, decider checks gate publishing; thresholds never retuned automatically | Proposed (not implemented) |
 | [ADR-26](#adr-26-no-vpc) | No VPC: IAM-only access to OpenSearch Serverless, Lambdas outside any VPC, decider with network isolation | Search part superseded by ADR-32; decider part accepted |
@@ -528,6 +528,8 @@ The AgentCore decider stacks, pool logic, measurement project and volume cleanup
 
 **Amendment (2026-11-15).** A narrowing turn's clarifying question, such as "Is that your mom or your dad?", is spoken even when replies are off. It had stayed on screen as an optional follow-up, because the shelf already shows results; in practice a silent question is easy to miss, and the point of asking is that the shopper hears it. With this, every question the app puts to the shopper is spoken, and statements about the shelf stay on screen. The cost is a few more spoken lines per session, only on turns that ask.
 
+**Amendment (2026-11-18).** The Voice on / Voice off toggle is removed. With every question to the shopper and every answer about the open item spoken (ADR-37), the toggle only decided whether statements about the shelf ("Showing 12 of 48 wallets") were read out, which is what this ADR found distracting. In testing it was never switched on; one behaviour is simpler to explain and to test. The `ui.voice_replies` message is gone, and the session host rejects it like any unknown message. A shopper who cannot look at the screen would need more than this toggle, such as the products themselves described aloud.
+
 **Evidence.** Design review of the frontend, 2026-10-18.
 
 ---
@@ -850,7 +852,7 @@ A public sample cannot ship that data, and it cannot ask every deployer to downl
 - **Show more.** `show_more` is an intent, offered only with a shelf. It adds the next 12 results of the latest search, up to 49 (the `best_fit` limit), and scrolls down. "Go back" returns to the shorter shelf. If the shelf is not from the latest search, the turn searches again.
 - **Remove from the cart.** A `remove_from_cart` Gateway tool and Lambda deletes one cart line in `VoiceShop-Cart`. A `cart_item` question names the line ("remove the blouse from my cart"). Below its act threshold (0.85, provisional) the host asks "Should I remove ...?". One line in the cart and a confident intent removes it directly. "Empty my cart" always asks "Should I empty the cart?" first. An empty cart is reported. The × on a cart line sends `ui.cart_remove` and removes that line without asking the decider.
 - **Yes/No buttons.** Every yes/no question shows Yes and No buttons. If the browser already allows the microphone, it opens automatically for the answer and stays on. No permission prompt appears without a click.
-- **Voice off.** With spoken replies off, the chat shows the app's reply text.
+- **On-screen replies.** The chat shows the app's reply text; only questions and item answers are spoken (ADR-23).
 - **Frame chunking.** A shelf over 12 items goes as `ui.shelf` with the first 12, then `ui.shelf_append` frames of 12 each, so every frame stays under 64 KB.
 - **Pointing without the open product.** The pointing round sees the cards on screen but not the open product or a pending offer. Without them, "can you go with number five" chose No. 5 at 0.52.
 - **"No" plus a new request.** A confident no with another request drops the offer and runs the request. A no whose request is the offered action itself ("no" to "go back?" read as `go_back`) still only declines.

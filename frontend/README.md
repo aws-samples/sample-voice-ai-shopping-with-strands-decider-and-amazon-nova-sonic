@@ -10,8 +10,7 @@ React + Vite + TypeScript shopping UI, hosted on AWS Amplify Hosting (`VoiceShop
 
 - **Shelf:** up to 12 product cards, each with its on-screen number. Say "number 5" or describe it ("the red one"), or tap a card.
 - **Chips:** committed choices (recipient, gender, department, category, budget) with their confidence. Click any chip (recipient, gender, department, category or budget) to remove it.
-- **Voice on / Voice off:** spoken replies are off by default and the choice is remembered per browser. Yes/no confirmations ("Do you mean No. 5, ...?") are spoken either way.
-- **Voice off:** the chat shows the app's reply text.
+- **What is spoken:** questions to the shopper ("Do you mean No. 5, ...?", "Is that your mom or your dad?") and answers about the open item. Everything else is shown on screen, and the chat shows the app's reply text.
 - **More and moving:** "show me more" adds the next 12 results, up to 49. "Scroll down" and "back to the top" move the page; "close it" closes the open product.
 - **Yes/No buttons:** every yes/no question shows them. If the browser already allows the mic, it opens automatically for the answer.
 - **Cart and order:** the cart updates live. Remove a line by voice ("remove the blouse from my cart") or with its ×; "empty my cart" asks first. "Place my order" always asks "Should I place the order?" first, and an empty cart is reported. The order is a DynamoDB record. No payment is taken.

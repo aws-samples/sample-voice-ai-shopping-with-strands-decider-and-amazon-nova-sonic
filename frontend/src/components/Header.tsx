@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { MicState } from '../state/useShopSession';
 import type { ConnectionState, StatusKind } from '../services/protocol';
-import { BagIcon, CartIcon, MicIcon, MicOffIcon, SendIcon, SpeakerIcon, SpeakerOffIcon, UserIcon } from './Icons';
+import { BagIcon, CartIcon, MicIcon, MicOffIcon, SendIcon, UserIcon } from './Icons';
 
 interface HeaderProps {
   connection: ConnectionState;
@@ -9,8 +9,6 @@ interface HeaderProps {
   mic: MicState;
   micLevel: number;
   cartCount: number;
-  voiceReplies: boolean;
-  onVoiceRepliesChange: (enabled: boolean) => void;
   userName?: string;
   onMicToggle: () => void;
   onSendText: (text: string) => void;
@@ -91,17 +89,6 @@ export function Header(props: HeaderProps) {
           </div>
           <button type="submit" className="icon-button" aria-label="Send" disabled={!draft.trim() || connection !== 'connected'}>
             <SendIcon size={18} />
-          </button>
-          <button
-            type="button"
-            className={`voice-toggle${props.voiceReplies ? ' voice-toggle--on' : ''}`}
-            role="switch"
-            aria-checked={props.voiceReplies}
-            onClick={() => props.onVoiceRepliesChange(!props.voiceReplies)}
-            title={props.voiceReplies ? 'Spoken replies on: the assistant talks back' : 'Spoken replies off: answers appear on screen only'}
-          >
-            {props.voiceReplies ? <SpeakerIcon size={18} /> : <SpeakerOffIcon size={18} />}
-            <span className="voice-toggle__label">{props.voiceReplies ? 'Voice on' : 'Voice off'}</span>
           </button>
         </form>
 

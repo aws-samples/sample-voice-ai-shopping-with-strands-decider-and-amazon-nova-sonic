@@ -7,9 +7,10 @@ Owns the Strands BidiAgent + BedrockNovaSonicModel for one shopping session:
 - Output tap: user transcript deltas feed speculative retrieval (ADR-24), the
   final user transcript starts a turn, and events are forwarded to the browser in
   the frontend's message names.
-- Audio gate (ADR-23, design decision 2026-10-18): Sonic's audio reaches the
-  browser only when spoken replies are on, or for a yes/no confirmation turn
-  ("Should I add it to your cart?"). Transcripts are always forwarded as text.
+- Audio gate (ADR-23): Sonic's audio reaches the browser only for a turn whose
+  outcome says to speak: a question to the shopper ("Should I add it to your cart?",
+  "Is that your mom or your dad?") or an answer about the open item. Transcripts are
+  always forwarded as text.
 - Continuation: Strands restarts the Sonic connection itself
   before the 8-minute limit (restart_after_s 420, at a turn boundary, with the
   same system prompt, tools and history, mic input held during the swap). The
@@ -105,7 +106,7 @@ class SonicBridge:
             ask, no_match, hold, error), the "say" text, chips, cart summary, and whether to speak."""
             await self.send(activity.event(pipeline.state.turn_seq, 'sonic', 'Nova Sonic asked the app what to say (tool: get_turn_outcome)'))
             outcome = await pipeline.turn_outcome()
-            self._audio_allowed = bool(outcome.get('speak')) or pipeline.voice_replies
+            self._audio_allowed = bool(outcome.get('speak'))
             return outcome
 
         @tool
@@ -288,12 +289,12 @@ class SonicBridge:
             await self.send({'type': 'bidi_transcript_stream', 'role': 'assistant', 'text': event.get('delta', ''), 'is_final': False})
         elif kind == 'bidi_transcript_block' and role == 'assistant':
             await self.send({'type': 'bidi_transcript_stream', 'role': 'assistant', 'text': event.get('transcript', ''), 'is_final': True})
-            spoken = self._audio_allowed or self.pipeline.voice_replies
             await self.send(activity.event(self.pipeline.state.turn_seq, 'sonic',
-                                           'Nova Sonic replied out loud' if spoken else 'Nova Sonic wrote the reply (voice is off)',
+                                           'Nova Sonic replied out loud' if self._audio_allowed
+                                           else 'Nova Sonic wrote the reply (shown on screen)',
                                            f"\"{event.get('transcript', '')[:160]}\""))
         elif kind == 'bidi_audio_delta':
-            if self._audio_allowed or self.pipeline.voice_replies:
+            if self._audio_allowed:
                 await self.send({'type': 'bidi_audio_stream', 'audio': event.get('audio', '')})
         elif kind == 'bidi_barge_in':
             await self.send({'type': 'bidi_interruption'})

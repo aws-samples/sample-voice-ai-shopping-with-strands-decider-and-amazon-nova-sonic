@@ -56,10 +56,8 @@ export interface ShopState {
   error: string | null;
   mic: MicState;
   micLevel: number;
-  voiceReplies: boolean;
 }
 
-const VOICE_REPLIES_KEY = 'voiceshop.voiceReplies';
 
 const initialState: ShopState = {
   connection: 'connecting',
@@ -80,7 +78,6 @@ const initialState: ShopState = {
   error: null,
   mic: 'off',
   micLevel: 0,
-  voiceReplies: localStorage.getItem(VOICE_REPLIES_KEY) === 'on',
 };
 
 type Action =
@@ -88,7 +85,6 @@ type Action =
   | { kind: 'connection'; state: ConnectionState }
   | { kind: 'mic'; state: MicState }
   | { kind: 'micLevel'; level: number }
-  | { kind: 'voiceReplies'; enabled: boolean }
   | { kind: 'closeProduct' }
   | { kind: 'dismissOrder' }
   | { kind: 'dismissError' };
@@ -117,8 +113,6 @@ function reducer(state: ShopState, action: Action): ShopState {
       return { ...state, mic: action.state, micLevel: action.state === 'on' ? state.micLevel : 0 };
     case 'micLevel':
       return { ...state, micLevel: action.level };
-    case 'voiceReplies':
-      return { ...state, voiceReplies: action.enabled };
     case 'closeProduct':
       return { ...state, product: null };
     case 'dismissOrder':
@@ -161,12 +155,11 @@ function reducer(state: ShopState, action: Action): ShopState {
       const text = m.text ?? m.transcript ?? '';
       if (!text) return state;
       if ((m.role ?? 'assistant') === 'user' && m.is_final) state = { ...state, question: null };   // answered
-      // Voice off: Sonic only says "Here you go." / "Take a look."; the chat shows the app's reply (ui.reply).
-      if ((m.role ?? 'assistant') === 'assistant' && !state.voiceReplies) return state;
+      // Visual-first (ADR-23): Sonic's own words are not shown; the chat shows the app's reply (ui.reply).
+      if ((m.role ?? 'assistant') === 'assistant') return state;
       return { ...state, conversation: addTranscript(state.conversation, m.role ?? 'assistant', text, m.is_final ?? false) };
     }
     case 'ui.reply':
-      if (state.voiceReplies) return state;   // voice on: the chat shows what Sonic says
       return { ...state, conversation: addTranscript(state.conversation, 'assistant', m.text, true) };
     case 'error':
       return { ...state, error: m.message };
@@ -179,7 +172,6 @@ export function useShopSession(transport: SessionTransport) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const player = useRef(new SpeechPlayer());
   const mic = useRef<MicrophoneCapture | null>(null);
-  const voiceReplies = useRef(state.voiceReplies);
   const columns = useRef<number | null>(null);
   const listenForAnswer = useRef<() => void>(() => undefined);   // set below, once startMic exists   // re-sent on every connect: a layout sent earlier is lost
 
@@ -187,14 +179,13 @@ export function useShopSession(transport: SessionTransport) {
     transport.onConnectionChange((s) => {
       dispatch({ kind: 'connection', state: s });
       if (s === 'connected') {
-        transport.send({ type: 'ui.voice_replies', enabled: voiceReplies.current });
         if (columns.current) transport.send({ type: 'ui.layout', columns: columns.current });
       }
     });
     transport.onMessage((message) => {
       if (message.type === 'bidi_audio_stream') {
-        // Visual-first (ADR-23): the session host only sends audio when spoken replies
-        // are on, or for a yes/no confirmation, so everything that arrives is played.
+        // Visual-first (ADR-23): the session host only sends audio for a question to the
+        // shopper or an answer about the open item, so everything that arrives is played.
         player.current.play(bufferFromBase64(message.audio));
         return;
       }
@@ -273,13 +264,6 @@ export function useShopSession(transport: SessionTransport) {
     setColumns: useCallback((n: number) => {
       columns.current = n;
       transport.send({ type: 'ui.layout', columns: n });
-    }, [transport]),
-    setVoiceReplies: useCallback((enabled: boolean) => {
-      voiceReplies.current = enabled;
-      localStorage.setItem(VOICE_REPLIES_KEY, enabled ? 'on' : 'off');
-      if (!enabled) player.current.flush();
-      transport.send({ type: 'ui.voice_replies', enabled });
-      dispatch({ kind: 'voiceReplies', enabled });
     }, [transport]),
     dismissOrder: useCallback(() => dispatch({ kind: 'dismissOrder' }), []),
     dismissError: useCallback(() => dispatch({ kind: 'dismissError' }), []),
