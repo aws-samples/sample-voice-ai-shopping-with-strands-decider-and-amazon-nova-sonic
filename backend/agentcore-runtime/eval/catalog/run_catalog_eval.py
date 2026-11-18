@@ -40,7 +40,7 @@ from turn_pipeline import Deps, TurnPipeline  # noqa: E402
 
 REGION = os.environ.get('AWS_REGION', 'us-east-1')
 THRESHOLDS = [round(0.05 * i, 2) for i in range(1, 20)]   # 0.05 .. 0.95
-SLOT_QUESTIONS = ('intent', 'recipient', 'gender', 'department', 'category', 'budget_band', 'offer_reply')
+SLOT_QUESTIONS = ('intent', 'recipient', 'gender', 'department', 'category', 'budget_band', 'offer_reply', 'item_detail')
 
 
 def catalog_meta() -> questions.Catalog:

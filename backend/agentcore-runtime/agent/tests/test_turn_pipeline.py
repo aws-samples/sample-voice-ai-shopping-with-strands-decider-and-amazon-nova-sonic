@@ -1072,3 +1072,66 @@ def test_a_confirm_sentence_adds_no_chips():
         return before, p
     before, p = run(go())
     assert p.state.department == before['department'] and p.state.category == before['category']
+
+
+# ---- questions about the open item (ADR-37)
+
+class RecordTools(FakeTools):
+    """The product record has the fields a question is answered from."""
+    async def get_product_detail(self, args):
+        product = next(p for p in CATALOG if p['asin'] == args['asin'])
+        return {'product': {**product, 'material': 'leather', 'features': ['Zip closure', 'Card slots', 'Wrist strap'],
+                            'description': 'A soft everyday bag.', 'averageRating': 4.6, 'ratingNumber': 812}}
+
+
+def _open_then_ask(question, intent_p=0.9, detail='material'):
+    async def go():
+        p, tools, decider, sent = make(MOM, tools=RecordTools())
+        await p.on_final('a gift for my mom')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.95)}
+        await p.on_final('the second one')
+        searches_before = len(tools.searches) if hasattr(tools, 'searches') else None
+        opened = p.state.open_product['asin']
+        p.deps.ask_decider.script = {'intent': ans('intent', 'ask_about_item', intent_p),
+                                     'item_detail': ans('item_detail', detail, 0.9)}
+        outcome = await p.on_final(question)
+        return p, outcome, opened, decider, sent
+    return run(go())
+
+
+def test_a_question_about_the_open_item_is_answered_from_its_record():
+    p, outcome, opened, decider, _ = _open_then_ask('what is it made of')
+    assert outcome['directive'] == 'answer'
+    assert outcome['say'].startswith("It's made of leather.")
+    assert p.state.open_product and p.state.open_product['asin'] == opened   # the item stays open
+    assert outcome['speak'] is True                                          # an answer to a question
+    # The add-to-cart offer survives the answer, so "yes" still adds it.
+    assert p.state.pending_offer == f'add_to_cart:{opened}' and 'Should I add it to your cart?' in outcome['say']
+    # No search ran for the question.
+    assert not any('best_fit' in qs for text, qs in decider.calls[-3:])
+
+
+def test_an_unsure_item_question_is_still_answered_not_turned_into_a_search():
+    p, outcome, opened, _, _ = _open_then_ask('is it real leather', intent_p=0.35)
+    assert outcome['directive'] == 'answer' and p.state.open_product['asin'] == opened
+
+
+def test_a_detail_the_record_does_not_hold_is_said_plainly():
+    _, outcome, _, _, _ = _open_then_ask('what size is it', detail='size')
+    assert outcome['say'].startswith("The listing doesn't give a size")
+
+
+def test_the_item_question_is_offered_only_while_an_item_is_open():
+    async def go():
+        p, _, decider, _ = make(MOM)
+        await p.on_final('a gift for my mom')
+        return decider
+    decider = run(go())
+    intent_options = [qs for text, qs in decider.calls if 'intent' in qs]
+    assert intent_options   # the intent question was asked
+    from questions import understand_questions, Catalog
+    from state import SessionState
+    s = SessionState(session_id='s' + 'x' * 30)
+    assert 'ask_about_item' not in understand_questions(s, ['intent'], Catalog(total=1))['intent']['criteria']
+    s.open_product = {'asin': 'H000000001', 'title': 'bag'}
+    assert 'ask_about_item' in understand_questions(s, ['intent'], Catalog(total=1))['intent']['criteria']

@@ -23,6 +23,7 @@ import activity
 import decider_client
 import filters
 import metrics
+import item_answers
 import policy
 import questions
 import ui_events
@@ -395,8 +396,10 @@ class TurnPipeline:
             # sentence (parsed in code, so it is what the shopper said).
             kept = {'budget' if q == 'budget_band' else q for q in changes}
             plan.commits = {k: v for k, v in plan.commits.items() if k in kept or v.source in kept or v.source == 'stated'}
-        if plan.intent != 'confirm':
-            state.pending_offer = None   # an offer answers only the very next sentence
+        if plan.intent not in ('confirm', 'ask_about_item'):
+            # An offer answers only the very next sentence, except a question about the item it
+            # is about: "what is it made of?" then "yes" adds it (ADR-37).
+            state.pending_offer = None
         if plan.intent == 'narrowing':
             state.push_history()        # go back returns to what was on screen before this sentence
         before = {s: state.committed(s) for s in ('recipient', 'gender', 'department', 'category', 'budget')}
@@ -444,7 +447,8 @@ class TurnPipeline:
             'narrowing': self._narrowing, 'pointing': self._pointing, 'confirm': self._confirm,
             'place_order': self._place_order, 'go_back': self._go_back, 'start_over': self._start_over,
             'ask_offer': self._ask_offer, 'decline': self._decline,
-            'close_item': self._close_item, 'move_screen': self._move_screen, 'show_more': self._show_more,
+            'close_item': self._close_item, 'ask_about_item': self._ask_about_item,
+            'move_screen': self._move_screen, 'show_more': self._show_more,
             'remove_from_cart': self._remove_from_cart,
         }.get(plan.intent)
         if retrieval is not None and plan.intent != 'narrowing':
@@ -468,9 +472,10 @@ class TurnPipeline:
         # Visual-first (ADR-23): speak when spoken replies are on, and for every question to the
         # shopper: yes/no confirmations (design decision 2026-10-18), which card they mean (owner,
         # 2026-10-25) and the one clarifying question of a narrowing turn ("Is that your mom or
-        # your dad?"; owner, 2026-11-15). Statements about the shelf stay on screen.
+        # your dad?"; owner, 2026-11-15), and the answer to the shopper's own question about the
+        # open item (ADR-37). Statements about the shelf stay on screen.
         outcome['speak'] = self.voice_replies or bool(outcome.get('confirmation')) \
-            or outcome['directive'] == 'ask'
+            or outcome['directive'] in ('ask', 'answer')
         if outcome.get('say'):
             await deps.send(ui_events.reply(turn, outcome['say']))
         if state.pending_offer:
@@ -922,6 +927,43 @@ class TurnPipeline:
         await self.deps.send(ui_events.scroll(turn, 'down'))
         return {'directive': 'act', 'say': f'Showing {len(state.shelf)} of {total} matches. '
                                            f'Items {len(on_screen) + 1} to {len(state.shelf)} are new.'}
+
+    async def _ask_about_item(self, turn, plan, retrieval, timings, decider_down) -> dict:
+        """A question about the open item (ADR-37): no search, the item stays open, and the
+        answer comes from its product record, never from a model's own words. The pending
+        offer stays, so "yes" after the answer still adds it."""
+        state, deps = self.state, self.deps
+        product = state.open_product
+        if not product:   # offered only with an open item, so this is a race with a tap
+            return {'directive': 'ask', 'say': 'Which item do you mean? You can tap it.'}
+        detail_id = None
+        try:
+            result = await self._ask('item_detail', f'Shopper said: "{state.transcripts[-1]}"',
+                                     questions.item_detail_question())
+            answer = result.answers.get('item_detail')
+            detail_id = answer.choice if answer else None
+            self._round_answers['item_detail'] = answer
+            timings['itemDetailMs'] = round(result.client_ms)
+        except (DeciderUnavailable, DeciderError):
+            logger.warning('⚠️ item_detail question failed', exc_info=True)
+        try:
+            started = time.perf_counter()
+            record = (await deps.tools.get_product_detail({'asin': product['asin']})).get('product') or {}
+            await self._activity('dynamodb', 'Read the product details from DynamoDB (VoiceShop-Products)',
+                                 record.get('title', product['asin'])[:80], (time.perf_counter() - started) * 1000)
+        except Exception:  # noqa: BLE001
+            logger.error('❌ get_product_detail failed', exc_info=True)
+            record = {}
+        said = item_answers.answer(detail_id, record) if record else item_answers.UNKNOWN
+        outcome = {'directive': 'answer', 'say': said}
+        if state.pending_offer:
+            # The same question the item asked when it opened, so the shopper hears it again.
+            offer = state.pending_offer
+            question = 'Should I add it to your cart?' if offer.startswith('add_to_cart:') else \
+                'Should I add another one?' if offer.startswith('add_more:') else f'Should I {questions.offer_text(state)}?'
+            outcome['say'] = f'{said} {question}'
+            outcome['confirmation'] = True
+        return outcome
 
     async def _close_item(self, turn, plan, retrieval, timings, decider_down) -> dict:
         self.state.open_product = None

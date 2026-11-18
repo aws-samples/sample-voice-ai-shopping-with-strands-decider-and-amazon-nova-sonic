@@ -5,7 +5,7 @@ Each scenario is a short conversation run through the real turn pipeline. A turn
 labels name the answer each question should give when it is asked on that turn
 (questions not asked on a turn are not scored):
 
-  intent, recipient, gender, department, category, budget_band, offer_reply
+  intent, recipient, gender, department, category, budget_band, offer_reply, item_detail
   match   True when the catalog has something that fits the request, False when not
           (scored against the best_fit none_of_these probability, ADR-21)
 
@@ -172,6 +172,33 @@ for offer, yes, no, new in [
             if offer == 'add_open':
                 setup['open'] = 1
             sc('authored', ('a gift for my mom', {}), (s, {'offer_reply': label}, setup))
+
+# ---- with an item open (ADR-37): questions about it, and sentences that are not questions
+# Appended last so the earlier scenario ids, and their results, stay comparable. Each opens a
+# shelf item first ('open'), as a tap or "number N" would. Labels written before any run.
+for opener, questions_about, others in [
+        ('show me leather wallets',
+         [('what is it made of', 'material'), ('is it real leather', 'material'), ('what color is this', 'color'),
+          ('how much does it cost', 'price')],
+         [('something in black', {'intent': 'narrowing'}), ('add it to my cart', {'intent': 'confirm'}),
+          ('close this', {'intent': 'close_item'})]),
+        ('a handbag for my mom',
+         [('who makes this one', 'brand'), ('what does it have inside', 'features'), ('is it in stock', 'availability'),
+          ('tell me more about this bag', 'description')],
+         [('a cheaper one', {'intent': 'narrowing'}), ('number five instead', {'intent': 'pointing'}),
+          ('show me more', {'intent': 'show_more'})]),
+        ('a watch for my dad',
+         [('what is the strap made of', 'material'), ('how are the reviews', 'rating'), ('how much is this watch', 'price')],
+         [('show me gold watches', {'intent': 'narrowing'}), ('yes add this one', {'intent': 'confirm'}),
+          ('hide it', {'intent': 'close_item'})]),
+        ('running shoes for me',
+         [('what size is this', 'size'), ('what are these made of', 'material'), ('are they comfortable for running', 'features')],
+         [('in white', {'intent': 'narrowing'}), ('the third one', {'intent': 'pointing'}), ('add them', {'intent': 'confirm'})]),
+        ]:
+    for sentence, detail in questions_about:
+        sc('authored', (opener, {}), (sentence, {'intent': 'ask_about_item', 'item_detail': detail}, {'open': 2}))
+    for sentence, labels in others:
+        sc('authored', (opener, {}), (sentence, labels, {'open': 2}))
 
 out = Path(__file__).with_name('scenarios.jsonl')
 with out.open('w') as f:

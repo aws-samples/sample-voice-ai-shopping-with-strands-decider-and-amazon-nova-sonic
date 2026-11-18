@@ -19,7 +19,7 @@ NONE = 'none'
 NOT_MENTIONED = 'not_mentioned'
 
 INTENTS = ['narrowing', 'pointing', 'confirm', 'remove_from_cart', 'place_order', 'go_back', 'start_over', 'close_item',
-           'move_screen', 'show_more', 'other']
+           'ask_about_item', 'move_screen', 'show_more', 'other']
 # Option descriptions measured on the live decider (2026-10-18): with them the top
 # intent was right for 11 of 12 test sentences; bare names left most below 0.5.
 INTENT_DESCRIPTIONS = {
@@ -40,6 +40,11 @@ INTENT_DESCRIPTIONS = {
     # place_order 0.50 and "scroll down" a search; with them 0.90 and 0.94. "The items
     # stay the same" keeps "show me more of those" (purple ones) narrowing, 0.59.
     'close_item': "Wants to close the open item and see the results again, without choosing anything (e.g. 'close this', 'hide it')",
+    # Offered only while an item is open (ADR-37). Read as narrowing, "what is it made of" ran a
+    # search and closed the item. Widening 'other' instead, which is offered on every sentence,
+    # pulled 39 ordinary searches to it (intent top-1 0.82 -> 0.58 on the tuning split).
+    'ask_about_item': "Asks a question about the open item itself, without asking to see other products "
+                      "(e.g. 'what is it made of', 'is it real leather', 'how much is it', 'what color is it')",
     'move_screen': "Wants to scroll the page up or down; the items stay the same (e.g. 'scroll down', 'scroll back up to the top')",
     # "Can you show me the next twelve" was a new search that returned the same twelve
     # (live session, 2026-10-20); with this option 7 of 7 such sentences are show_more
@@ -113,6 +118,7 @@ SLOT_PRIORITY = ['recipient', 'gender', 'department', 'category', 'budget_band']
 
 INSTRUCTIONS = {
     'intent': 'What does the shopper want to do with their latest sentence?',
+    'item_detail': 'Which detail of the open item does the shopper ask about?',
     'recipient': 'Who is the shopper buying for?',
     'gender': 'Does the shopper say which gender the products are for?',
     'department': 'Which part of the store is the shopper shopping in?',
@@ -221,7 +227,8 @@ def understand_questions(state: SessionState, ids: list[str], catalog: Catalog, 
     (default: the committed one)."""
     # Only the actions the screen allows: pointing and scrolling need a shelf, closing an open item.
     intents = [i for i in INTENTS if (state.shelf or i not in ('pointing', 'move_screen', 'show_more'))
-               and (state.open_product or i != 'close_item') and (state.cart.get('itemCount') or i != 'remove_from_cart')]
+               and (state.open_product or i not in ('close_item', 'ask_about_item'))
+               and (state.cart.get('itemCount') or i != 'remove_from_cart')]
     department = department or (state.department.value if state.department else None)
     builders = {
         'intent': lambda: {'type': 'choice', 'instructions': INSTRUCTIONS['intent'],
@@ -326,6 +333,25 @@ def pointing_text(state: SessionState, transcript: str) -> str:
     plain = SessionState.from_dict(state.to_dict())
     plain.open_product, plain.pending_offer = None, None
     return state_text(plain, transcript, listing=True)
+
+
+ITEM_DETAILS = {
+    'material': 'What it is made of',
+    'color': 'Its color',
+    'size': 'Its size',
+    'price': 'How much it costs',
+    'brand': 'Who makes it',
+    'features': 'What it has or does, its features',
+    'rating': 'How well it is rated or reviewed',
+    'availability': 'Whether it is in stock',
+    'description': 'What it is like in general, a description',
+    'other': 'Something else about it',
+}
+
+
+def item_detail_question() -> dict:
+    """Asked alone after an ask_about_item intent: which part of the product record answers it."""
+    return {'item_detail': {'type': 'choice', 'instructions': INSTRUCTIONS['item_detail'], 'criteria': dict(ITEM_DETAILS)}}
 
 
 def scroll_question() -> dict:

@@ -63,7 +63,7 @@ Rules:
 - If "speak" is false, the shopper is reading the screen: reply with at most three words, "Here you go." when the directive is act or narrow, and "Take a look." for anything else.
 - If the directive is "hold", say a two-word filler such as "One moment." and nothing else.
 - Never state a price, total, count, percentage or product detail that is not in the outcome or in a get_product_detail result.
-- Use get_product_detail only to answer a question about the open product, such as what it is made of.
+- A question about the open product is already answered in the outcome's "say" text (directive "answer"): say that answer and add nothing to it. Use get_product_detail only if the outcome has no answer.
 - Never offer to search, add to the cart or place an order yourself; the store does that when the shopper asks."""
 
 

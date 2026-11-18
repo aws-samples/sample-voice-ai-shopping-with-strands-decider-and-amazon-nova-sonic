@@ -56,6 +56,7 @@ DIRECTIVES = {
     'no_match': 'Decision: nothing matched exactly; showing the closest items',
     'error': 'Something failed; the app says so',
     'other': 'Decision: nothing to do for this sentence',
+    'answer': 'Decision: a question about the open item, answered from its product record',
 }
 
 

@@ -914,3 +914,32 @@ Of the 12 department and category changes the re-check committed across the 221 
 A category is only committed alongside a department that still holds: when a sentence points at another department but not confidently enough to move, its category answer is dropped too, so the pair can never disagree.
 
 **Consequences.** The re-check is two calls instead of one when gender or a band budget is also committed, run in parallel with the others, so a turn waits for the slowest and not the sum. Nothing downstream changed: a confident different department still drops the category it carried, and the category round asks again within the new department. A sentence that names a pattern rather than a place, such as "something with a floral pattern", still searches within the current shelf, which is the intended reading.
+
+#### ADR-37: A question about the open item is answered from its product record
+
+**Status.** Accepted 2026-11-17.
+
+**Context.** The decider had no intent for a question about the item on screen, so "what is it made of" with a wallet open was read as narrowing (0.44), ran a search and closed the item; every following sentence then had no item to act on ("close this" became "nothing to order yet"). Product questions had only ever been answered by Nova Sonic with its `get_product_detail` tool when spoken replies were on, and even then the search had already closed the item.
+
+**Options.**
+
+| Option | Result |
+|---|---|
+| Widen the `other` description to name product questions | Rejected after a full run: `other` is offered on every sentence, so it pulled 39 ordinary searches to it ("running shoes for me", "under 25 dollars"); intent top-1 fell from 0.82 to 0.58 (tuning) and 0.92 to 0.50 (held-out) |
+| A rule such as "with an item open, do not search unless a chip changes" | Rejected: breaks colour and style requests, which change no chip ("something in black") |
+| **A new intent offered only while an item is open, answered in code** | Chosen |
+
+**Decision.** `ask_about_item` is offered only while an item is open, the same gating `close_item` uses, so on every other sentence the option does not exist. When it wins, a second question (`item_detail`) picks the detail asked about (material, color, size, price, brand, features, rating, availability, description, other), and `item_answers.answer` builds one sentence from the product record's own fields. A detail the record does not hold is said plainly ("I don't have that detail for this one"), never filled in. The item stays open, nothing is searched, the pending add-to-cart offer survives and is asked again, and the answer is spoken (a reply to the shopper's question). Sonic says the coded answer and adds nothing to it. An unsure reading (narrow band) is still answered, because an answer writes nothing and keeps the item open; below the ask threshold the sentence narrows, as any other intent does.
+
+**Evidence.** 26 scenarios added to the labeled set (17 tuning, 9 held-out), each with an item open: 14 product questions and 12 sentences that are not questions. On the full run against the live endpoint:
+
+| | Result |
+|---|---|
+| Product questions read as `ask_about_item` | 14 of 14 (held-out 5 of 5), confidence 0.37 to 0.94 |
+| Detail picked right | 14 of 14 |
+| Non-questions read as `ask_about_item` | 0 of 12 |
+| Non-questions read as their labeled intent | 10 of 12 ("show me gold watches" was show_more 0.23 and "in white" confirm 0.18, both existing misreads) |
+
+The original 116 scenarios: 7 turns changed. Two are the intended fix ("what is it made of" in s009 and s107 is now answered instead of searched) and five are run-to-run noise of 0.02 to 0.07 in confidence. `ask_about_item` never appeared outside an open item. Three right answers were in the narrow band (0.37, 0.39, 0.46), which is why the narrow band answers rather than narrows.
+
+**Consequences.** One more decider call (`item_detail`) and one Gateway read (`get_product_detail`) on an item question, about 0.2 seconds. The record answers what it holds; a question it cannot answer, such as whether a bag has a zipper when that is not among its features, gets "I don't have that detail". Answering those from the product photo would need a model looking at the image, a possible later step.

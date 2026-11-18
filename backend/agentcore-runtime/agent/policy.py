@@ -192,7 +192,7 @@ def plan_understand(state: SessionState, answers: dict[str, Answer], parsed_budg
         # labeled set every such offer was wrong ("a lawn mower" was start_over 0.27,
         # "Should I start over?"), so the sentence narrows like any other.
         intent = plan.intent = 'narrowing'
-    if intent_band != 'act' and intent not in ('narrowing', 'pointing'):
+    if intent_band != 'act' and intent not in ('narrowing', 'pointing', 'ask_about_item'):
         demote = True
         offer = {'place_order': 'place_order', 'go_back': 'go_back', 'start_over': 'start_over'}.get(intent)
         if intent == 'confirm':
@@ -202,6 +202,9 @@ def plan_understand(state: SessionState, answers: dict[str, Answer], parsed_budg
         plan.confirmation = bool(offer)
     elif intent_band != 'act' and intent == 'pointing':
         plan.intent = 'pointing'
+    # A question about the open item is answered at act and narrow alike: the answer writes
+    # nothing and keeps the item open, so a wrong reading costs one sentence (ADR-37), like a
+    # scroll. Below the ask threshold it narrows, by the rule above.
     if demote and intent == 'remove_from_cart' and intent_band == 'narrow':
         # An unsure removal still runs, but its handler only asks ("Should I remove ...?").
         plan.intent, plan.offer, plan.confirmation = 'remove_from_cart', None, False
