@@ -687,7 +687,7 @@ A public sample cannot ship that data, and it cannot ask every deployer to downl
 - The `pointed_item` options describe each card by number, ordinal, row and side, then title and color. The shelf listing goes only to this question.
 - Thresholds (`calibration.json`):
   - confidence ≥ 0.20: open the card. The reply names it: "Opened No. N, <short title>, <price>. Should I add it to your cart?"
-  - 0.10 to 0.20: ask "Do you mean No. N, <short title>?". This yes/no question is spoken even when spoken replies are off. "Yes" opens it.
+  - 0.10 to 0.20: ask "Do you mean No. N, <short title>?". This yes/no question is always spoken. "Yes" opens it.
   - below 0.10: ask "Which number do you mean? You can also tap it."
 
 **Consequences.** Held-out results (40 sentences, women's watches shelf, 3 runs, identical each run):
@@ -721,7 +721,7 @@ A public sample cannot ship that data, and it cannot ask every deployer to downl
 **Decision.** (c).
 
 - A no-match never hides the shelf. The closest items (in `best_fit` order) stay, marked tentative, with the notice "No exact match. These are the closest."
-- The turn ends with one yes/no offer, spoken even when spoken replies are off. To choose it, the host searches once without each committed hard filter (category, department, gender, budget), in parallel, and counts what passes the other filters. It offers to drop the filter that adds the most matches, for example "Should I look beyond watches? That shows N matches."
+- The turn ends with one yes/no offer, which is always spoken. To choose it, the host searches once without each committed hard filter (category, department, gender, budget), in parallel, and counts what passes the other filters. It offers to drop the filter that adds the most matches, for example "Should I look beyond watches? That shows N matches."
 - "Yes" drops that filter and searches again. Like every offer, it answers only the next sentence.
 - If no filter adds matches, the turn asks "What should I change?".
 - The shelf is empty only when nothing at all passes the hard filters.

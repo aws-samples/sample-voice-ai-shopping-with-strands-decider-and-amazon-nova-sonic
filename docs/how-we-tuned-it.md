@@ -80,7 +80,7 @@ The changes that mattered:
 Every card on the shelf shows its number. Pointing uses one policy around the item question:
 
 - **At or above 0.20:** open the card. Opening is reversible, and the spoken line names the card by number: "Opened No. 3, …, $19.99. Should I add it to your cart?"
-- **0.10 to 0.20:** ask "Do you mean No. 5, the silver dog-print kids' watch?", spoken even when spoken replies are off. "Yes" opens it.
+- **0.10 to 0.20:** ask "Do you mean No. 5, the silver dog-print kids' watch?", always spoken. "Yes" opens it.
 - **Below 0.10:** ask "Which number do you mean? You can also tap it."
 
 The 0.20 threshold comes from the tuning set: the lowest with open precision ≥ 0.95. The tuning set was 36 cases, on a hand-made shelf and a shelf from the earlier catalog, run 3 times.
@@ -102,7 +102,7 @@ So 84% of opens were right on held-out data, against 95% on the tuning set: the 
 These design decisions were made on 2026-10-18 and 2026-10-19:
 
 - **Narrowing is the safe default.** When the top intent is narrowing, at any confidence, the turn narrows and each slot commits on its own confidence. Chips can be removed with a click.
-- **Irreversible intents need act-level confidence.** Below their threshold, `confirm`, `go_back` and `start_over` become an offer: the action is recorded, one yes/no question is asked ("Should I go back to the previous results?"), and the shelf is left alone. `place_order` is always an offer, at any confidence: "Should I place the order?". An empty cart is reported instead. The question is spoken even when spoken replies are off. The reply is its own question, asked with only the offer and the reply: a confident yes carries out the recorded action, a confident no drops it (ADR-31).
+- **Irreversible intents need act-level confidence.** Below their threshold, `confirm`, `go_back` and `start_over` become an offer: the action is recorded, one yes/no question is asked ("Should I go back to the previous results?"), and the shelf is left alone. `place_order` is always an offer, at any confidence: "Should I place the order?". An empty cart is reported instead. The question is always spoken. The reply is its own question, asked with only the offer and the reply: a confident yes carries out the recorded action, a confident no drops it (ADR-31).
 - **An offer answers only the next sentence.** If the shopper says something else, the offer is dropped, so a stale "add it to your cart?" never survives a new search.
 - **Every chip is re-asked each turn.** Each committed chip's question is asked again with only the latest sentence and the current chips, without the earlier sentences, so they do not pull the answer back. The recipient is re-asked without its own chip in the context. A confident different answer replaces the chip ("actually it's for my dad" changes Mom to Dad). An unsure one becomes an offer: "Should I shop for your father instead?". A new recipient resets the gender, department, category and budget ([ADR-33](architecture-decisions.md#adr-33-change-of-mind-by-re-checking-every-chip)).
 - **Unspecified relatives get the obvious follow-up.** For a parent, partner or child with no gender, the next question is "Is that your mom or your dad?".

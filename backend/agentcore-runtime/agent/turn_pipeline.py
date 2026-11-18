@@ -635,7 +635,7 @@ class TurnPipeline:
         timings['chooseMs'] = round((time.perf_counter() - started) * 1000)
         self._round_answers.update(chosen.answers)
         # One policy: confident -> open it; unsure -> confirm it by its on-screen number
-        # (the shopper decides, spoken even with voice replies off); nothing -> ask.
+        # (the shopper decides, and the question is spoken); nothing -> ask.
         answer = chosen.answers.get('pointed_item')
         number = next((i + 1 for i, p in enumerate(state.shelf) if answer and p['asin'] == answer.choice), None)
         band = deps.thresholds.band(answer.confidence if answer else None, 'pointed_item') if number else 'ask'
@@ -1037,8 +1037,8 @@ class TurnPipeline:
                                              len(state.shelf), len(state.shelf)))
 
     async def _no_match_outcome(self, said: str, matches: int, counts: dict) -> dict:
-        """A no-match ends with one yes/no offer to widen the search (spoken even with
-        voice replies off). It drops the filter that adds the most matches, measured
+        """A no-match ends with one yes/no offer to widen the search (spoken, as every
+        question is). It drops the filter that adds the most matches, measured
         by searching once without each committed filter."""
         offer = await self._widen_offer(matches)
         if not offer:
