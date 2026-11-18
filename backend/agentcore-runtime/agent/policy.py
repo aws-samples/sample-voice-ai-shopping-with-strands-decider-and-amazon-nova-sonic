@@ -52,6 +52,9 @@ class Thresholds:
     # question id -> the confidence needed to REPLACE a committed chip, where that is more
     # than the act threshold for setting an empty slot (ADR-36). Falls back to act.
     per_question_change: dict = field(default_factory=dict)
+    # Pointing: ask between the top two cards when the second scores at least this fraction
+    # of the first (ADR-38). None keeps the earlier behaviour (always open the top card).
+    pointing_tie_ratio: float | None = None
 
     def __post_init__(self):
         for name, (act, ask) in {'default': (self.act, self.ask), **self.per_question}.items():
@@ -60,12 +63,15 @@ class Thresholds:
         for name, change in self.per_question_change.items():
             if not (self.for_question(name)[0] <= change <= 1):
                 raise ValueError(f'{name}: change threshold must be between its act threshold and 1 (got {change})')
+        if self.pointing_tie_ratio is not None and not (0 < self.pointing_tie_ratio < 1):
+            raise ValueError(f'pointing tie ratio must be in (0, 1), got {self.pointing_tie_ratio}')
         if not (0 < self.no_match < 1):
             raise ValueError(f'NO_MATCH_THRESHOLD must be in (0, 1), got {self.no_match}')
 
     @classmethod
     def from_env(cls, calibration_file: str = CALIBRATION_FILE) -> 'Thresholds':
         per_question, per_question_change = {}, {}
+        pointing_tie_ratio = None
         no_match = str(DEFAULT_NO_MATCH)
         if os.path.exists(calibration_file):
             with open(calibration_file, encoding='utf-8') as f:
@@ -74,10 +80,12 @@ class Thresholds:
                 per_question[qid] = (float(values['act']), float(values['ask']))
                 if values.get('change') is not None:
                     per_question_change[qid] = float(values['change'])
+                if qid == 'pointed_item' and values.get('tieRatio') is not None:
+                    pointing_tie_ratio = float(values['tieRatio'])
             no_match = str(calibration.get('noMatch', {}).get('threshold', no_match))
         return cls(act=float(os.environ.get('ACT_THRESHOLD', '0.8')), ask=float(os.environ.get('ASK_THRESHOLD', '0.5')),
                    no_match=float(os.environ.get('NO_MATCH_THRESHOLD', no_match)), per_question=per_question,
-                   per_question_change=per_question_change)
+                   per_question_change=per_question_change, pointing_tie_ratio=pointing_tie_ratio)
 
     def for_question(self, question_id: str | None) -> tuple[float, float]:
         return self.per_question.get(question_id or '', (self.act, self.ask))

@@ -32,7 +32,9 @@
     "pointed_item": {
       "act": 0.2,
       "ask": 0.1,
-      "measured": "Pointing evaluation on the earlier catalog, 2026-10-18 (script removed): open precision >= 0.95 at 0.20 on the tuning set (36 cases x 3). Held-out (40 new sentences, watch shelf from the earlier catalog, 3 runs): 27 opened right, 5 opened wrong (row-relative phrases such as 'bottom right'), 4 confirmed by number, 4 asked. Between 0.10 and 0.20 the host asks 'Do you mean No. N ...?'"
+      "measured": "Pointing evaluation on the earlier catalog, 2026-10-18 (script removed): open precision >= 0.95 at 0.20 on the tuning set (36 cases x 3). Held-out (40 new sentences, watch shelf from the earlier catalog, 3 runs): 27 opened right, 5 opened wrong (row-relative phrases such as 'bottom right'), 4 confirmed by number, 4 asked. Between 0.10 and 0.20 the host asks 'Do you mean No. N ...?'",
+      "tieRatio": 0.25,
+      "tieMeasured": "ADR-38, live endpoint 2026-11-18, four real shelves (backpacks, handbags, t-shirts, sneakers): when the second card scores at least a quarter of the top one, the turn asks \"Do you mean No. A or No. B?\" instead of opening. Pointing by number (20 cases) had p2/p1 at most 0.16 and a colour on one card (25) at most 0.05, all right; a colour on several cards (11) had 0.12 to 0.95. At 0.25: 9 of 11 shared-colour turns ask, none of the 45 others. The two below (0.23, 0.12) open a card of the asked colour. Full evaluation (273 turns, 2026-11-18): it also asks on 3 of 10 number sentences, each where the decider was split (top card 0.30 to 0.34, \"the second one please\" 0.30 against 0.29); those opens had been right by a narrow margin."
     },
     "department": {
       "act": 0.4,

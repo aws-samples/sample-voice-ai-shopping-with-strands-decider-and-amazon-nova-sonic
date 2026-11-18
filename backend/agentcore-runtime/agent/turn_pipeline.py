@@ -384,13 +384,19 @@ class TurnPipeline:
             # ask about that one change, and keep the shelf until the shopper answers.
             plan = policy.UnderstandPlan(intent='ask_offer', intent_band=plan.intent_band, confirmation=True,
                                          offer=f'switch:{unsure[0]}:{unsure[1]}')
-        if plan.intent != 'narrowing' and plan.intent_band == 'act':
-            # The decider's reading adds chips only on a narrowing sentence. Any other confident
-            # sentence (pointing, confirm, close, show more, remove, order...) acts on what is on
-            # screen, and the open-slot answers, read with the earlier sentences and the open
-            # product in the context, can pick those up: "number three" committed Tops (2026-10-23)
-            # and "yeah i got it" committed Boys' Tops (2026-10-25), and the hard filter then refused
-            # cards on screen. Kept: a change of mind (re-checked with the latest sentence alone),
+        top_intent = answers['intent'].choice if answers.get('intent') else None
+        if plan.intent != 'narrowing' and (plan.intent_band == 'act' or top_intent != 'narrowing'):
+            # The decider's reading adds chips only on a narrowing sentence. Any other sentence
+            # (pointing, confirm, close, show more, remove, order...) acts on what is on screen,
+            # and the open-slot answers, read with the earlier sentences and the open product in
+            # the context, can pick those up: "number three" committed Tops (2026-10-23) and "yeah
+            # i got it" committed Boys' Tops (2026-10-25), and the hard filter then refused cards
+            # on screen. This held only for a confident intent until 2026-11-18, when "i like the
+            # one in black" (pointing 0.38, unsure) committed Men's Clothing and T-Shirts from the
+            # earlier "show me t shirts" and the black kids' tee it pointed at was refused (ADR-38).
+            # A turn that is still narrowing at heart, such as a narrowing sentence that leans
+            # toward a different chip and is asked about instead, keeps its commits.
+            # Kept: a change of mind (re-checked with the latest sentence alone),
             # what it implies (a chip whose source names that slot), and an amount stated in this
             # sentence (parsed in code, so it is what the shopper said).
             kept = {'budget' if q == 'budget_band' else q for q in changes}
@@ -633,6 +639,13 @@ class TurnPipeline:
         answer = chosen.answers.get('pointed_item')
         number = next((i + 1 for i, p in enumerate(state.shelf) if answer and p['asin'] == answer.choice), None)
         band = deps.thresholds.band(answer.confidence if answer else None, 'pointed_item') if number else 'ask'
+        tied = self._tied_card(answer) if band == 'act' else None
+        if tied is not None:
+            # Two cards fit about as well ("the orange one" with three orange bags): ask which,
+            # by number, rather than open the first (ADR-38). The shopper's answer points again.
+            return {'directive': 'ask',
+                    'say': f"Do you mean {questions.short_name(state.shelf[number - 1], number)}, "
+                           f"or {questions.short_name(state.shelf[tied - 1], tied)}?"}
         if band == 'act':
             return await self._open(turn, answer.choice, pointed_probability=answer.confidence)
         if band == 'narrow':
@@ -640,6 +653,21 @@ class TurnPipeline:
             return {'directive': 'ask', 'confirmation': True,
                     'say': f"Do you mean {questions.short_name(state.shelf[number - 1], number)}?"}
         return {'directive': 'ask', 'say': 'Which number do you mean? You can also tap it.'}
+
+    def _tied_card(self, answer) -> int | None:
+        """The on-screen number of a second card that scores at least pointing_tie_ratio of the
+        top card's probability, or None. Pointing by number or by a colour only one card has
+        scored at most 0.16 here; a colour several cards share 0.12 to 0.95 (ADR-38)."""
+        ratio = self.deps.thresholds.pointing_tie_ratio
+        top = answer.probabilities.get(answer.choice) if answer else None
+        if not ratio or not top:
+            return None
+        on_screen = {p['asin']: i + 1 for i, p in enumerate(self.state.shelf)}
+        others = sorted(((v, k) for k, v in answer.probabilities.items() if k in on_screen and k != answer.choice),
+                        reverse=True)
+        if others and others[0][0] >= ratio * top:
+            return on_screen[others[0][1]]
+        return None
 
     async def _open(self, turn: int, asin: str, pointed_probability: float | None = None) -> dict:
         state, deps = self.state, self.deps

@@ -945,3 +945,26 @@ A category is only committed alongside a department that still holds: when a sen
 The original 116 scenarios: 7 turns changed. Two are the intended fix ("what is it made of" in s009 and s107 is now answered instead of searched) and five are run-to-run noise of 0.02 to 0.07 in confidence. `ask_about_item` never appeared outside an open item. Three right answers were in the narrow band (0.37, 0.39, 0.46), which is why the narrow band answers rather than narrows.
 
 **Consequences.** One more decider call (`item_detail`) and one Gateway read (`get_product_detail`) on an item question, about 0.2 seconds. The record answers what it holds; a question it cannot answer, such as whether a bag has a zipper when that is not among its features, gets "I don't have that detail". Answering those from the product photo would need a model looking at the image, a possible later step.
+
+#### ADR-38: Pointing at a card by what it looks like
+
+**Status.** Accepted 2026-11-18.
+
+**Context.** The reviewer asked whether a shopper can pick a card by its appearance ("the blue one", "the one with the black lining"). Every card's pointing option already carries its title and colour, and on four real shelves the decider picked the right card for 25 of 25 sentences naming a colour only one card has, and for 20 of 20 by number. Live, though, "i like the one in black" after "show me t shirts" answered "I can't open that one", and so did "the one with the wave sign on it". Two problems, in two places.
+
+**1. A pointing sentence added chips when its intent was unsure.** The guard that keeps a non-narrowing sentence from committing chips applied only to a confident intent. Colour sentences read as pointing at 0.19 to 0.53, below act, so the open-slot answers, read with the earlier "show me t shirts", committed Men's Clothing and T-Shirts. The hard filter then refused the black kids' tee on screen that the decider had pointed at. The guard now applies whenever the sentence was not read as narrowing, at any confidence. A narrowing sentence that leans toward a different chip and is asked about instead still keeps its commits. A test replays the live session.
+
+**2. Two cards that fit about equally.** With three orange bags on screen, "the orange one" opened the first at 0.44. Pointing now asks "Do you mean No. A, ..., or No. B, ...?" when the second card's probability is at least a quarter of the top card's (`tieRatio` 0.25 for `pointed_item` in `calibration.json`), and the shopper's answer points again.
+
+| Measured | Second card ÷ top card | At 0.25 |
+|---|---|---|
+| Four real shelves: by number (20) | at most 0.16 | always opens |
+| A colour one card has (25) | at most 0.05 | always opens |
+| A colour several cards share (11) | 0.12 to 0.95 | asks on 9; the 2 below open a card of that colour |
+| Full evaluation, number sentences (10) | 0.03 to 0.98 | asks on 3 |
+
+Those 3 are the cost, accepted: "the second one please" (top card 0.30, second 0.29), "it was number five not number six" (0.30) and "no add number five, i like number five" (0.34). In each the decider was split and the earlier open was right by a narrow margin; asking there follows the app's rule of acting when sure and asking when not, at the price of one more reply. "show me the blue one instead", which had opened a lavender bracelet, now asks.
+
+**Not solved.** Appearance details that no field holds ("the one with the black lining") cannot be pointed at from text. That needs a model looking at the card images, measured for latency first, because pointing is the fastest turn the app has.
+
+**Evaluation note.** This run's diff against the previous one shows more changed turns than the code explains: the deploy rebuilt the search index, and the approximate k-NN order of near-equal products differs between builds, so several shelves, and the pointing and item answers on them, came out differently. Compare runs on the same index build when isolating a change.

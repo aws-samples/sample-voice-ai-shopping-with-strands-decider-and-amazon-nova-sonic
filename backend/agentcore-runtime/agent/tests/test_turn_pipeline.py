@@ -113,7 +113,9 @@ class FakeDecider:
                 answers[qid] = Answer(qid, top, 0.2, probs)
             elif qid == 'pointed_item':
                 options = list(spec['criteria'])
-                answers[qid] = ans(qid, options[1], self.script.get('_pointed_p', 0.93), {})
+                # '_pointed_others': {shelf index: probability} for other cards (a near tie, ADR-38).
+                others = {options[i]: v for i, v in self.script.get('_pointed_others', {}).items()}
+                answers[qid] = ans(qid, options[1], self.script.get('_pointed_p', 0.93), others)
             elif qid in self.script:
                 answers[qid] = self.script[qid]
         return DeciderResult(answers=answers, server_ms=100.0, client_ms=110.0, invalid=[])
@@ -1135,3 +1137,47 @@ def test_the_item_question_is_offered_only_while_an_item_is_open():
     assert 'ask_about_item' not in understand_questions(s, ['intent'], Catalog(total=1))['intent']['criteria']
     s.open_product = {'asin': 'H000000001', 'title': 'bag'}
     assert 'ask_about_item' in understand_questions(s, ['intent'], Catalog(total=1))['intent']['criteria']
+
+
+def test_an_unsure_pointing_sentence_commits_no_chips():
+    """ADR-38, live 2026-11-18: after "show me t shirts" (no chips), "i like the one in black" was
+    pointing at only 0.38, so the guard that keeps a pointing sentence from adding chips was
+    skipped; the open-slot answers committed a department and the hard filter then refused the
+    black card it had pointed at ("I can't open that one")."""
+    async def go():
+        p, _, _, sent = make({'intent': ans('intent', 'narrowing', 0.9)})
+        await p.on_final('show me some bags')
+        assert p.state.department is None
+        # The pointing sentence's open-slot answers would commit a department the shelf does not match.
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.38),
+                                     'department': ans('department', 'Jewelry & Watches', 0.9)}
+        await p.on_final('i like the one in purple')
+        return p, sent
+    p, sent = run(go())
+    assert p.state.department is None                       # no chip from a pointing sentence
+    assert of(sent, 'ui.product_open'), 'the pointed card opens'
+    assert p.state.open_product is not None
+
+
+def _point_with(probs_second):
+    """Pointing where the second shelf card is the top pick (0.6) and the third scores probs_second."""
+    async def go():
+        p, _, _, sent = make({'intent': ans('intent', 'narrowing', 0.9)})
+        await p.on_final('show me some bags')
+        p.deps.ask_decider.script = {'intent': ans('intent', 'pointing', 0.9), '_pointed_p': 0.6,
+                                     '_pointed_others': {2: probs_second}}
+        outcome = await p.on_final('the orange one')
+        return p, outcome, sent
+    return run(go())
+
+def test_two_cards_that_fit_about_equally_are_asked_about_not_opened():
+    """ADR-38: "the orange one" with three orange bags opened the first at 0.44."""
+    p, outcome, sent = _point_with(0.4)          # 0.4 / 0.6 = 0.67, above the 0.25 tie ratio
+    assert outcome['directive'] == 'ask' and outcome['say'].startswith('Do you mean No. 2') and 'or No. 3' in outcome['say']
+    assert p.state.open_product is None and not of(sent, 'ui.product_open')
+    assert outcome['speak'] is True
+
+
+def test_a_clear_winner_still_opens():
+    p, outcome, _ = _point_with(0.05)            # 0.05 / 0.6 = 0.08, like pointing by number
+    assert p.state.open_product is not None and outcome['directive'] == 'act'
