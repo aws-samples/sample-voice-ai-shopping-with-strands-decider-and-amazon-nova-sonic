@@ -6,7 +6,8 @@ phases:
     runtime-versions:
       python: 3.12
     commands:
-      - pip install --quiet -r requirements.txt
+      # Hashed lock (requirements.in -> requirements.txt, by uv): every package and its hash pinned.
+      - pip install --quiet --require-hashes --no-deps --only-binary :all: -r requirements.txt
   build:
     commands:
       - python3 -u curate.py

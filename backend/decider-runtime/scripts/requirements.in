@@ -1,0 +1,3 @@
+# measure-latency.py and prewarm.py (CodeBuild VoiceShop-DeciderMeasure and deploy-all.sh). Edit this file, then regenerate the lock:
+#   uv pip compile requirements.in --universal --python-version 3.12 --generate-hashes -o requirements.txt
+boto3==1.43.114

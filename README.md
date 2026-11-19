@@ -562,13 +562,12 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
   - Recent turns, with their transcripts, are kept in the Sessions table for 24 hours. Transcripts stay out of the logs unless `LOG_TRANSCRIPTS=true` is set on the session host.
   - Data is encrypted with AWS managed keys (no customer managed AWS KMS keys), DynamoDB point-in-time recovery is off, every stack's resources are deleted with the stack, and `deploy-all.sh` deploys without approval prompts (`--require-approval never`).
   - Rate limits: browser messages per connection, 20 sentences a minute per shopper across all connections (`USER_TURNS_PER_MINUTE`), and a queue of 16 calls in the decider (`DECIDER_MAX_QUEUE`), beyond which it answers busy and the turn keeps the current results. Tune these for your traffic, and raise `deciderMaxInstances` for many concurrent shoppers.
-  - Build-time installs: the container images install from hashed lock files, but four build and deploy steps (the model download, the catalog load, the latency measurement and the deploy script's prewarm) pin only their top-level Python package. For production, give these hashed locks too.
 
   For production, turn on MFA, remove the password flow, put the Debug overlay behind a flag, review data retention, consider customer managed keys and point-in-time recovery and retain data on stack deletion.
 
 - **Production controls not included.** The sample does not set up Amazon Bedrock Guardrails (harmful content, profanity and PII filters) for the spoken replies and transcripts, Amazon Bedrock model invocation logging, AWS X-Ray tracing or AgentCore observability, a configurable log level (the code logs at INFO), Amazon S3 lifecycle rules (the access-log bucket keeps its logs until the stack is deleted), AWS CloudTrail data events, AWS Config rules or Amazon CloudWatch alarms. Add the ones your organization requires before you use this in production.
 
-- **Python dependencies are locked.** Each container's `requirements.txt` is a lock file with hashes, generated from `requirements.in` by [uv](https://docs.astral.sh/uv/); the command is in the file header. To change a dependency, edit `requirements.in` and regenerate the lock.
+- **Python dependencies are locked.** Every Python install, in the container images and in the build and deploy steps (the model download, the catalog load, the latency measurement and the deploy script's pre-warm), uses a `requirements.txt` that is a lock file with hashes, generated from `requirements.in` by [uv](https://docs.astral.sh/uv/) and installed with `--require-hashes`; the command is in each file's header. To change a dependency, edit `requirements.in` and regenerate the lock. Dependabot proposes updates as pull requests; run the tests, and the labeled evaluation when the decider is affected, before merging.
 
 ### Limitations
 

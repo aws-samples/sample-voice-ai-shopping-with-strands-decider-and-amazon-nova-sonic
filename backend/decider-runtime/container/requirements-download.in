@@ -1,0 +1,4 @@
+# The model-upload CodeBuild job's dependency (huggingface-cli). Not installed in the decider image.
+# Edit this file, then regenerate the lock:
+#   uv pip compile requirements-download.in --universal --python-version 3.12 --generate-hashes -o requirements-download.txt
+huggingface_hub==0.36.0

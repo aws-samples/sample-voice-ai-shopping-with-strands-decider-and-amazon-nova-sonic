@@ -98,7 +98,7 @@ export class DeciderInfraStack extends cdk.Stack {
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
-          install: { 'runtime-versions': { python: '3.12' }, commands: ['pip install --quiet huggingface_hub==0.36.0'] },
+          install: { 'runtime-versions': { python: '3.12' }, commands: ['pip install --quiet --require-hashes --no-deps --only-binary :all: -r requirements-download.txt'] },   // container/requirements-download.txt, hashed
           build: {
             commands: [
               // SageMaker mounts s3://<bucket>/model/ at /opt/ml/model (container/serve.py).
