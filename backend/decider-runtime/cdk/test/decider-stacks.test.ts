@@ -86,3 +86,24 @@ test('endpoint runs on the GPU host image with driver 550 (CUDA 12.4)', () => {
     ProductionVariants: [Match.objectLike({ InferenceAmiVersion: 'al2-ami-sagemaker-inference-gpu-3-1' })],
   });
 });
+
+// Every CodeBuild project that installs from a lock file must have that file in its source:
+// the model-upload job had an inline buildspec and no source, so requirements-download.txt
+// was "No such file or directory" (2026-11-19).
+test('each CodeBuild install reads a lock file that is in its source', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const sourceDirs: Record<string, string> = {
+    'VoiceShop-DeciderModelUpload': path.join(__dirname, '../../container'),
+    'VoiceShop-DeciderMeasure': path.join(__dirname, '../../scripts'),
+  };
+  const projects = { ...infraTemplate.findResources('AWS::CodeBuild::Project'), ...t.findResources('AWS::CodeBuild::Project') };
+  for (const [name, dir] of Object.entries(sourceDirs)) {
+    const project = Object.values(projects).find((p: any) => p.Properties.Name === name) as any;
+    expect(project).toBeDefined();
+    expect(project.Properties.Source.Type).toBe('S3');
+    const lock = /-r (\S+\.txt)/.exec(JSON.stringify(project.Properties.Source.BuildSpec))![1];
+    expect(fs.existsSync(path.join(dir, lock))).toBe(true);
+    expect(fs.readFileSync(path.join(dir, lock), 'utf8')).toContain('--hash=sha256:');
+  }
+});

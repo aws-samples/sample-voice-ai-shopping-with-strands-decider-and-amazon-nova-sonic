@@ -87,6 +87,8 @@ export class DeciderInfraStack extends cdk.Stack {
     this.modelUploadProject = new codebuild.Project(this, 'DeciderModelUploadProject', {
       projectName: 'VoiceShop-DeciderModelUpload',
       description: 'Downloads the Strands Decider checkpoint (amazon organization) and its Qwen3.5-2B base model from Hugging Face, at pinned commits, into the model bucket.',
+      // The container folder, for its hashed lock (requirements-download.txt); the job builds nothing from it.
+      source: codebuild.Source.s3({ bucket: sourceAsset.bucket, path: sourceAsset.s3ObjectKey }),
       environment: { buildImage: codebuild.LinuxBuildImage.STANDARD_7_0, computeType: codebuild.ComputeType.MEDIUM },
       environmentVariables: {
         MODEL_BUCKET: { value: this.modelBucket.bucketName },

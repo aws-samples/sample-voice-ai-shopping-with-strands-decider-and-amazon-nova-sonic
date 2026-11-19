@@ -7,7 +7,8 @@ phases:
       python: 3.12
     commands:
       # Hashed lock (requirements.in -> requirements.txt, by uv): every package and its hash pinned.
-      - pip install --quiet --require-hashes --no-deps --only-binary :all: -r requirements.txt
+      # Quoted: unquoted, YAML reads ":all: " as a mapping key.
+      - 'pip install --quiet --require-hashes --no-deps --only-binary :all: -r requirements.txt'
   build:
     commands:
       - python3 -u curate.py

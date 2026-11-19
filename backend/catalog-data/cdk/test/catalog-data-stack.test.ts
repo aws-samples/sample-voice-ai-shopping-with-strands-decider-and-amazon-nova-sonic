@@ -46,3 +46,16 @@ test('the loader embeds with the same model the query side uses', () => {
 test('cdk-nag reports no unsuppressed errors', () => {
   expect(Annotations.fromStack(stack).findError('*', Match.stringLikeRegexp('AwsSolutions-.*'))).toEqual([]);
 });
+
+// CodeBuild reads curation-buildspec.yml as YAML: an unquoted "--only-binary :all: -r ..." made the
+// install line a mapping ("Expected Commands[0] to be of string type", 2026-11-19).
+test('the curation buildspec parses, and every command is a string that installs from the hashed lock', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const yaml = require('js-yaml');
+  const spec = yaml.load(fs.readFileSync(path.join(__dirname, '../../curation-buildspec.yml'), 'utf8'));
+  const commands = [...spec.phases.install.commands, ...spec.phases.build.commands];
+  for (const c of commands) expect(typeof c).toBe('string');
+  expect(commands.some((c: string) => c.includes('--require-hashes') && c.includes('-r requirements.txt'))).toBe(true);
+  expect(fs.readFileSync(path.join(__dirname, '../../requirements.txt'), 'utf8')).toContain('--hash=sha256:');
+});
