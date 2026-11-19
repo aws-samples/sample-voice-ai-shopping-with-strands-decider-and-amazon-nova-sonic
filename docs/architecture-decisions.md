@@ -967,4 +967,6 @@ Those 3 are the cost, accepted: "the second one please" (top card 0.30, second 0
 
 **Not solved.** Appearance details that no field holds ("the one with the black lining") cannot be pointed at from text. That needs a model looking at the card images, measured for latency first, because pointing is the fastest turn the app has.
 
+**Live test (2026-11-19).** The two-card question worked ("i like the one with the mountain" asked between a grey and an olive mountain tee). Colour sentences mostly did not reach pointing: "i like the gray one" and "i like the green one" were read as narrowing and searched for grey and green tees. The probe asked the pointing question directly; live, the intent question decides first, and "I like the X one" reads as a preference as often as a pick. Not pursued: it would take new labeled data and re-calibration of the intent question. Recorded in the README's limitations, with "close it" when nothing is open.
+
 **Evaluation note.** This run's diff against the previous one shows more changed turns than the code explains: the deploy rebuilt the search index, and the approximate k-NN order of near-equal products differs between builds, so several shelves, and the pointing and item answers on them, came out differently. Compare runs on the same index build when isolating a change.
