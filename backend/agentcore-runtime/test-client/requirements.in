@@ -1,4 +1,4 @@
-# text_client.py's direct dependencies (run on your machine, Python 3.12+; websockets matches the session host). Edit this file, then regenerate the lock:
+# text_client.py's direct dependencies (run on your machine, Python 3.12 to 3.14, as in README.md; websockets matches the session host). Edit this file, then regenerate the lock:
 #   uv pip compile requirements.in --universal --python-version 3.12 --generate-hashes -o requirements.txt
 boto3==1.43.114
 websockets==15.0.1
