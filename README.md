@@ -138,7 +138,7 @@ These deployment instructions work on **macOS** and **Amazon Linux 2023**, and o
 Install the following tools before deployment:
 
 - [Node.js](https://nodejs.org/) 22.x (AWS CDK apps and Lambda functions)
-- [Python](https://www.python.org/downloads/) 3.12+ (the decider pre-warm step and the test clients)
+- [Python](https://www.python.org/downloads/) 3.12 to 3.14 (the decider pre-warm step and the test clients; `mcp-proxy-for-aws` does not support 3.15 yet)
 - [AWS Command Line Interface (AWS CLI)](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) 2.x configured with credentials
 - The AWS CDK CLI is installed by `npm ci` in each CDK app and run with `npx cdk`, so no global install is needed.
 
@@ -303,7 +303,7 @@ Follow these steps to deploy each component individually. Deploy in the order li
 
 10. When the endpoint from step 5 is `InService`, pre-warm it. The first requests after creation are slow while the GPU kernels compile:
     ```bash
-    pip3 install boto3
+    pip3 install --require-hashes --no-deps --only-binary :all: -r backend/decider-runtime/scripts/requirements.txt
     python3 backend/decider-runtime/scripts/prewarm.py --region us-east-1
     ```
 
@@ -345,14 +345,14 @@ Verify that all components deployed successfully by running the following checks
 
 3. **Verify the AgentCore Gateway tools.** List the MCP tools, and call each one:
    ```bash
-   pip3 install mcp mcp-proxy-for-aws boto3
+   pip3 install --require-hashes --no-deps --only-binary :all: -r backend/agentcore-gateway/test-client/requirements.txt
    python3 backend/agentcore-gateway/test-client/gateway-check.py --region us-east-1
    ```
    Expected output: five tools (`search_catalog`, `get_product_detail`, `add_to_cart`, `remove_from_cart`, `place_order`) with passing valid and invalid input checks, and the latency the Gateway adds.
 
 4. **Verify the session host.** Run a scripted text conversation against the deployed runtime:
    ```bash
-   pip3 install boto3 websockets
+   pip3 install --require-hashes --no-deps --only-binary :all: -r backend/agentcore-runtime/test-client/requirements.txt
    cat > tester.json <<'EOF'
    {"username": "AppUser", "password": "<your-password>", "client": "<USER_POOL_CLIENT_ID>"}
    EOF
@@ -567,7 +567,7 @@ Strands Decider weights are licensed under Apache-2.0. Every product, brand, des
 
 - **Production controls not included.** The sample does not set up Amazon Bedrock Guardrails (harmful content, profanity and PII filters) for the spoken replies and transcripts, Amazon Bedrock model invocation logging, AWS X-Ray tracing or AgentCore observability, a configurable log level (the code logs at INFO), Amazon S3 lifecycle rules (the access-log bucket keeps its logs until the stack is deleted), AWS CloudTrail data events, AWS Config rules or Amazon CloudWatch alarms. Add the ones your organization requires before you use this in production.
 
-- **Python dependencies are locked.** Every Python install, in the container images and in the build and deploy steps (the model download, the catalog load, the latency measurement and the deploy script's pre-warm), uses a `requirements.txt` that is a lock file with hashes, generated from `requirements.in` by [uv](https://docs.astral.sh/uv/) and installed with `--require-hashes`; the command is in each file's header. To change a dependency, edit `requirements.in` and regenerate the lock. Dependabot proposes updates as pull requests; run the tests, and the labeled evaluation when the decider is affected, before merging.
+- **Python dependencies are locked.** Every Python install, in the container images and in the build and deploy steps (the model download, the catalog load, the latency measurement and the deploy script's pre-warm) and in the manual steps (the pre-warm, the two test clients and the catalog generator), uses a `requirements.txt` that is a lock file with hashes, generated from `requirements.in` by [uv](https://docs.astral.sh/uv/) and installed with `--require-hashes`; the command is in each file's header. To change a dependency, edit `requirements.in` and regenerate the lock. Dependabot proposes updates as pull requests; run the tests, and the labeled evaluation when the decider is affected, before merging.
 
 ### Limitations
 

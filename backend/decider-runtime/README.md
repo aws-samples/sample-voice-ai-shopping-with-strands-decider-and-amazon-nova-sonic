@@ -12,7 +12,7 @@ The model files (~4.8 GB) are uploaded once by `deploy-all.sh` to the model buck
 
 ## Scaling and cost
 
-- The endpoint keeps **one ml.g6.xlarge always running** by default while deployed (NVIDIA L4, about $1.13/hour on-demand in us-east-1, ~$822/month), so no shopper waits for a cold start. If ml.g6.xlarge has no capacity, use `--decider-instance-type g5.xlarge` (NVIDIA A10G, about $1.41/hour, the same answers and latency on 2026-10-21). Run `cleanup-all.sh` when you are done.
+- The endpoint keeps **one ml.g6.xlarge always running** by default while deployed (NVIDIA L4, about $1.13/hour on-demand in us-east-1, ~$822/month, as of October 2026 per [Amazon SageMaker AI pricing](https://aws.amazon.com/sagemaker/ai/pricing/)), so no shopper waits for a cold start. If ml.g6.xlarge has no capacity, use `--decider-instance-type g5.xlarge` (NVIDIA A10G, about $1.41/hour on-demand, same date and source, the same answers and latency on 2026-10-21). Run `cleanup-all.sh` when you are done.
 - It scales out on invocations per instance (target 120 per minute, about half of one instance's capacity).
 - The scale-out cap defaults to **1**. Raise it with `./deploy-all.sh --decider-max-instances <n>`, after checking that your account's SageMaker quota **"ml.g6.xlarge for endpoint usage"** (Service Quotas, code `L-D470D954`) is at least `<n>`. Other instance types use their own quota. New accounts often start at 0 or 1; request an increase in the Service Quotas console first. `deploy-all.sh` refuses a value above your quota.
 - Other knobs live in `cdk/cdk.json`: `deciderInstanceType`, `deciderMinInstances`, `deciderInvocationsPerInstanceTarget`.

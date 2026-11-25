@@ -1,0 +1,5 @@
+# gateway-check.py's direct dependencies (run on your machine, Python 3.12+; versions match the session host). Edit this file, then regenerate the lock:
+#   uv pip compile requirements.in --universal --python-version 3.12 --generate-hashes -o requirements.txt
+boto3==1.43.114
+mcp==1.30.0
+mcp-proxy-for-aws==1.7.0

@@ -1,0 +1,4 @@
+# generate_catalog.py's direct dependencies (maintainer only; deploying does not need it). Edit this file, then regenerate the lock:
+#   uv pip compile requirements.in --universal --python-version 3.12 --generate-hashes -o requirements.txt
+boto3==1.43.114
+pillow==13.0.0

@@ -47,7 +47,7 @@ npx cdk deploy VoiceShop-CatalogDataStack                              # the pro
 
 Run this only to change the catalog. Deploying does not need it.
 
-**Needs:** Python 3.12 with `boto3` and `Pillow`, and Amazon Bedrock model access to Claude Sonnet 5, Claude Haiku 4.5, Stability AI Stable Image Core and Stability AI Remove Background. The image models run in us-west-2 (`--image-region`); the text models use cross-Region inference profiles (`--text-region`, default us-west-2).
+**Needs:** Python 3.12 with `boto3` and `Pillow` (pinned with hashes in `generate/requirements.txt`), and Amazon Bedrock model access to Claude Sonnet 5, Claude Haiku 4.5, Stability AI Stable Image Core and Stability AI Remove Background. The image models run in us-west-2 (`--image-region`); the text models use cross-Region inference profiles (`--text-region`, default us-west-2).
 
 Stages (each one resumable; finished work is skipped):
 
@@ -62,7 +62,7 @@ Stages (each one resumable; finished work is skipped):
 `all` runs every stage, then tops up any category with fewer than `--per-category` products that passed QA (up to 3 rounds).
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install boto3 Pillow
+python3 -m venv .venv && .venv/bin/pip install --require-hashes --no-deps --only-binary :all: -r generate/requirements.txt   # hashed lock
 cd generate
 ../.venv/bin/python generate_catalog.py all --out ../catalog-build               # all 50 categories, 50 products each
 ../.venv/bin/python generate_catalog.py all --out ../catalog-build --categories watches,rings --per-category 20
